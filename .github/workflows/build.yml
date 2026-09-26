@@ -21,6 +21,46 @@ jobs:
           test -d smritiai_build/lib
           test -d smritiai_build/android
 
+          cat > smritiai_build/pubspec.yaml <<'EOF'
+          name: smritiai
+          description: Dementia-friendly memory and caregiver support application.
+          publish_to: "none"
+          version: 1.0.0+1
+
+          environment:
+            sdk: ">=3.4.0 <4.0.0"
+
+          dependencies:
+            flutter:
+              sdk: flutter
+            cupertino_icons: ^1.0.8
+            supabase_flutter: ^2.8.0
+            shared_preferences: ^2.5.3
+            uuid: ^4.5.1
+            connectivity_plus: ^6.1.4
+            flutter_local_notifications: ^19.4.0
+            timezone: ^0.10.1
+            image_picker: ^1.1.2
+            record: ^6.0.0
+            flutter_tts: ^4.2.3
+            speech_to_text: ^7.0.0
+            permission_handler: ^12.0.1
+            flutter_secure_storage: ^9.2.4
+            cached_network_image: ^3.4.1
+            camera: ^0.11.1
+            audioplayers: ^6.5.0
+
+          dev_dependencies:
+            flutter_test:
+              sdk: flutter
+            flutter_lints: ^4.0.0
+
+          flutter:
+            uses-material-design: true
+            assets:
+              - assets/audio/
+          EOF
+
       - name: Setup Java
         uses: actions/setup-java@v5
         with:
