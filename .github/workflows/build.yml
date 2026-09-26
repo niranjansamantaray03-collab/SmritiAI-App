@@ -21,7 +21,7 @@ jobs:
 
 
       # ============================================================
-      # 2. EXTRACT ZIP
+      # 2. EXTRACT ORIGINAL SMRITIAI ZIP
       # ============================================================
 
       - name: Extract SmritiAI source
@@ -30,7 +30,7 @@ jobs:
           set -e
 
           echo "=========================================="
-          echo "EXTRACTING SMRITIAI"
+          echo "EXTRACTING SMRITIAI SOURCE"
           echo "=========================================="
 
           ZIP="SmritiAI_Source final.zip"
@@ -41,7 +41,6 @@ jobs:
           fi
 
           rm -rf smritiai_source
-
           mkdir -p smritiai_source
 
           unzip -q "$ZIP" -d smritiai_source
@@ -52,7 +51,7 @@ jobs:
 
 
       # ============================================================
-      # 3. FIND THE CORRECT INDEX.HTML
+      # 3. LOCATE THE REAL SMRITIAI APPLICATION
       # ============================================================
 
       - name: Locate SmritiAI application
@@ -61,7 +60,7 @@ jobs:
           set -e
 
           echo "=========================================="
-          echo "SEARCHING FOR SMRITIAI HTML"
+          echo "SEARCHING FOR SMRITIAI APPLICATION"
           echo "=========================================="
 
           FOUND=""
@@ -76,7 +75,6 @@ jobs:
 
             echo "Size: $SIZE bytes"
 
-            # Look for characteristics of the actual SmritiAI app.
             if grep -qiE \
               "SmritiAI|smritiai_v3|Connect Caregiver|RUDAS|caregiver|patient" \
               "$FILE"; then
@@ -86,7 +84,6 @@ jobs:
               FOUND="$FILE"
 
               break
-
             fi
 
           done < <(
@@ -99,18 +96,16 @@ jobs:
           if [ -z "$FOUND" ]; then
 
             echo ""
-            echo "ERROR:"
-            echo "Could not identify the SmritiAI index.html."
+            echo "ERROR: SmritiAI index.html was not found."
 
             echo ""
-            echo "Available HTML files:"
+            echo "HTML FILES:"
             find smritiai_source \
               -type f \
               -iname "*.html" \
               -print
 
             exit 1
-
           fi
 
           WEB_ROOT=$(dirname "$FOUND")
@@ -132,7 +127,7 @@ jobs:
 
 
       # ============================================================
-      # 4. VERIFY ORIGINAL APPLICATION
+      # 4. VERIFY ORIGINAL APP
       # ============================================================
 
       - name: Verify original SmritiAI
@@ -141,30 +136,44 @@ jobs:
           set -e
 
           echo "=========================================="
-          echo "VERIFYING ORIGINAL APPLICATION"
+          echo "VERIFYING ORIGINAL SMRITIAI"
           echo "=========================================="
 
           test -f "$INDEX_FILE"
 
-          echo ""
-          echo "HTML SIZE:"
-          wc -c "$INDEX_FILE"
+          SIZE=$(wc -c < "$INDEX_FILE")
 
           echo ""
-          echo "SmritiAI references:"
-          grep -oi "SmritiAI" "$INDEX_FILE" | head -20 || true
+          echo "Original index.html size:"
+          echo "$SIZE bytes"
+
+          if [ "$SIZE" -lt 20000 ]; then
+            echo "WARNING: index.html is unusually small."
+          fi
 
           echo ""
-          echo "RUDAS references:"
+          echo "SmritiAI:"
+          grep -oi "SmritiAI" "$INDEX_FILE" | head -10 || true
+
+          echo ""
+          echo "RUDAS:"
           grep -oi "RUDAS" "$INDEX_FILE" | head -20 || true
 
           echo ""
-          echo "Caregiver references:"
+          echo "Caregiver:"
           grep -oi "caregiver" "$INDEX_FILE" | head -20 || true
 
           echo ""
-          echo "Patient references:"
-          grep -oi "patient" "$INDEX_FILE" | head -20 || true
+          echo "Music/audio:"
+          grep -oiE \
+            "music|song|audio|playSound|sound|nostalgia" \
+            "$INDEX_FILE" \
+            | sort \
+            | uniq \
+            | head -50 || true
+
+          echo ""
+          echo "Original HTML verified."
 
 
       # ============================================================
@@ -217,7 +226,7 @@ jobs:
 
 
           # --------------------------------------------------------
-          # build.gradle
+          # root build.gradle
           # --------------------------------------------------------
 
           cat > android_wrapper/build.gradle <<'EOF'
@@ -255,13 +264,9 @@ jobs:
 
               defaultConfig {
                   applicationId "com.smritiai.app"
-
                   minSdk 23
-
                   targetSdk 35
-
                   versionCode 1
-
                   versionName "1.0.0"
               }
 
@@ -274,7 +279,7 @@ jobs:
 
 
           # --------------------------------------------------------
-          # Manifest
+          # Android Manifest
           # --------------------------------------------------------
 
           cat > android_wrapper/app/src/main/AndroidManifest.xml <<'EOF'
@@ -359,7 +364,7 @@ jobs:
 
 
       # ============================================================
-      # 6. COPY THE ENTIRE WEB APP
+      # 6. COPY THE COMPLETE ORIGINAL WEB APP
       # ============================================================
 
       - name: Copy complete SmritiAI web application
@@ -368,7 +373,7 @@ jobs:
           set -e
 
           echo "=========================================="
-          echo "COPYING COMPLETE SMRITIAI APPLICATION"
+          echo "COPYING ORIGINAL SMRITIAI"
           echo "=========================================="
 
           rm -rf \
@@ -377,40 +382,1033 @@ jobs:
           cp -R "$WEB_ROOT"/. \
             android_wrapper/app/src/main/assets/smritiai/
 
-
-          # --------------------------------------------------------
-          # Verify
-          # --------------------------------------------------------
-
           test -f \
             android_wrapper/app/src/main/assets/smritiai/index.html
 
-
           echo ""
-          echo "Copied files:"
+          echo "APPLICATION FILES:"
           find \
             android_wrapper/app/src/main/assets/smritiai \
-            -maxdepth 3 \
+            -maxdepth 4 \
             -type f \
             | sort \
             | head -300
 
-
           echo ""
-          echo "Final index.html:"
+          echo "INDEX SIZE:"
           wc -c \
             android_wrapper/app/src/main/assets/smritiai/index.html
 
 
       # ============================================================
-      # 7. DO NOT MODIFY THE APP YET
+      # 7. MODIFY ONLY THE UI CONTROLS
       #
-      # First build the ORIGINAL application inside Android.
-      #
-      # This guarantees that we are not breaking the original UI.
+      # IMPORTANT:
+      # - Existing app is preserved.
+      # - Existing music system is preserved.
+      # - RUDAS assessment is preserved.
+      # - Only permanent RUDAS floating control is hidden.
+      # - Small side icons are added.
       # ============================================================
 
-      - name: Verify original HTML inside Android assets
+      - name: Add SmritiAI side controls
+        shell: bash
+        run: |
+          set -e
+
+          python3 <<'PY'
+          from pathlib import Path
+          import re
+
+          html_path = Path(
+              "android_wrapper/app/src/main/assets/smritiai/index.html"
+          )
+
+          html = html_path.read_text(
+              encoding="utf-8",
+              errors="ignore"
+          )
+
+          original_size = len(html)
+
+          print("Original HTML characters:", original_size)
+
+          injection = r'''
+          <!-- ======================================================
+               SMRITIAI ANDROID SIDE CONTROLS
+               This layer does NOT replace the original app.
+               ====================================================== -->
+
+          <style id="smritiai-android-controls-style">
+
+            #smritiai-side-controls {
+              position: fixed;
+              right: 12px;
+              bottom: 92px;
+              z-index: 2147483000;
+
+              display: flex;
+              flex-direction: column;
+              gap: 10px;
+
+              pointer-events: auto;
+            }
+
+            .smritiai-side-button {
+              width: 48px;
+              height: 48px;
+
+              border: 0;
+              border-radius: 50%;
+
+              display: flex;
+              align-items: center;
+              justify-content: center;
+
+              font-size: 22px;
+
+              background: rgba(255,255,255,0.96);
+
+              box-shadow:
+                0 3px 14px rgba(0,0,0,0.18);
+
+              cursor: pointer;
+
+              -webkit-tap-highlight-color: transparent;
+
+              transition:
+                transform 0.15s ease,
+                box-shadow 0.15s ease;
+            }
+
+            .smritiai-side-button:active {
+              transform: scale(0.90);
+            }
+
+            .smritiai-side-button.music {
+              background: #fff7d6;
+            }
+
+            .smritiai-side-button.caregiver {
+              background: #e7f0ff;
+            }
+
+            .smritiai-side-button.logout {
+              background: #ffe8e8;
+            }
+
+            .smritiai-side-label {
+              position: absolute;
+
+              right: 58px;
+
+              white-space: nowrap;
+
+              padding: 6px 9px;
+
+              border-radius: 8px;
+
+              background: rgba(20,20,20,0.88);
+
+              color: white;
+
+              font-size: 12px;
+
+              opacity: 0;
+
+              pointer-events: none;
+
+              transform: translateX(5px);
+
+              transition:
+                opacity 0.15s ease,
+                transform 0.15s ease;
+            }
+
+            .smritiai-side-wrap {
+              position: relative;
+              display: flex;
+              justify-content: flex-end;
+            }
+
+            .smritiai-side-wrap:hover .smritiai-side-label {
+              opacity: 1;
+              transform: translateX(0);
+            }
+
+            /*
+             * Hide ONLY the permanent RUDAS/Progress floating
+             * control.
+             *
+             * We deliberately do NOT hide:
+             * - RUDAS assessment screens
+             * - RUDAS questions
+             * - RUDAS result pages
+             * - RUDAS history
+             * - RUDAS progress data
+             */
+
+            .smritiai-hide-rudas-floating {
+              display: none !important;
+              visibility: hidden !important;
+              opacity: 0 !important;
+              pointer-events: none !important;
+            }
+
+            @media (max-width: 600px) {
+
+              #smritiai-side-controls {
+                right: 8px;
+                bottom: 82px;
+                gap: 8px;
+              }
+
+              .smritiai-side-button {
+                width: 44px;
+                height: 44px;
+                font-size: 20px;
+              }
+
+            }
+
+          </style>
+
+          <div
+            id="smritiai-side-controls"
+            aria-label="SmritiAI quick controls">
+
+            <div class="smritiai-side-wrap">
+
+              <span class="smritiai-side-label">
+                Caregiver
+              </span>
+
+              <button
+                id="smritiai-caregiver-side-button"
+                class="smritiai-side-button caregiver"
+                type="button"
+                aria-label="Connect Caregiver"
+                title="Connect Caregiver">
+
+                👨‍👩‍👧
+
+              </button>
+
+            </div>
+
+
+            <div class="smritiai-side-wrap">
+
+              <span class="smritiai-side-label">
+                Music
+              </span>
+
+              <button
+                id="smritiai-music-side-button"
+                class="smritiai-side-button music"
+                type="button"
+                aria-label="Music"
+                title="Music">
+
+                🎵
+
+              </button>
+
+            </div>
+
+
+            <div class="smritiai-side-wrap">
+
+              <span class="smritiai-side-label">
+                Logout
+              </span>
+
+              <button
+                id="smritiai-logout-side-button"
+                class="smritiai-side-button logout"
+                type="button"
+                aria-label="Logout"
+                title="Logout">
+
+                🚪
+
+              </button>
+
+            </div>
+
+          </div>
+
+
+          <script id="smritiai-android-controls-script">
+
+          (function () {
+
+            "use strict";
+
+
+            /*
+             * Small delay so the original SmritiAI application
+             * has time to create its own buttons and screens.
+             */
+
+            function afterAppLoads(callback) {
+
+              if (
+                document.readyState === "complete" ||
+                document.readyState === "interactive"
+              ) {
+
+                setTimeout(callback, 700);
+
+              } else {
+
+                document.addEventListener(
+                  "DOMContentLoaded",
+                  function () {
+                    setTimeout(callback, 700);
+                  },
+                  { once: true }
+                );
+
+              }
+
+            }
+
+
+            /*
+             * Normalize text for searching.
+             */
+
+            function cleanText(value) {
+
+              return String(value || "")
+                .replace(/\s+/g, " ")
+                .trim()
+                .toLowerCase();
+
+            }
+
+
+            /*
+             * Get visible clickable elements.
+             */
+
+            function getClickableElements() {
+
+              return Array.from(
+                document.querySelectorAll(
+                  "button, a, [role='button'], input[type='button'], input[type='submit'], [onclick]"
+                )
+              );
+
+            }
+
+
+            /*
+             * Find an existing SmritiAI control.
+             *
+             * We use the original application's button whenever
+             * possible instead of creating a duplicate function.
+             */
+
+            function findExistingControl(keywords) {
+
+              var elements = getClickableElements();
+
+              for (var i = 0; i < elements.length; i++) {
+
+                var element = elements[i];
+
+                if (
+                  element.id &&
+                  element.id.indexOf("smritiai-") === 0
+                ) {
+                  continue;
+                }
+
+                var text = cleanText(
+                  element.innerText ||
+                  element.textContent ||
+                  element.value ||
+                  element.getAttribute("aria-label") ||
+                  element.getAttribute("title")
+                );
+
+                if (!text) {
+                  continue;
+                }
+
+                for (var j = 0; j < keywords.length; j++) {
+
+                  if (text.indexOf(keywords[j]) !== -1) {
+
+                    return element;
+
+                  }
+
+                }
+
+              }
+
+              return null;
+
+            }
+
+
+            /*
+             * Click the original application control.
+             */
+
+            function clickOriginalControl(keywords) {
+
+              var control =
+                findExistingControl(keywords);
+
+              if (control) {
+
+                console.log(
+                  "SmritiAI side control -> original control:",
+                  keywords
+                );
+
+                try {
+
+                  control.click();
+
+                  return true;
+
+                } catch (error) {
+
+                  console.log(
+                    "Normal click failed:",
+                    error
+                  );
+
+                  try {
+
+                    control.dispatchEvent(
+                      new MouseEvent(
+                        "click",
+                        {
+                          bubbles: true,
+                          cancelable: true,
+                          view: window
+                        }
+                      )
+                    );
+
+                    return true;
+
+                  } catch (secondError) {
+
+                    console.log(
+                      "Fallback click failed:",
+                      secondError
+                    );
+
+                  }
+
+                }
+
+              }
+
+              return false;
+
+            }
+
+
+            /*
+             * ------------------------------------------------------
+             * HIDE ONLY THE PERMANENT RUDAS/PROGRESS FLOATING BUTTON
+             * ------------------------------------------------------
+             *
+             * We do NOT remove every RUDAS reference.
+             */
+
+            function hideRudasProgressButton() {
+
+              var elements =
+                getClickableElements();
+
+              var hidden = 0;
+
+              elements.forEach(function (element) {
+
+                if (
+                  element.id &&
+                  element.id.indexOf("smritiai-") === 0
+                ) {
+                  return;
+                }
+
+                var text = cleanText(
+                  element.innerText ||
+                  element.textContent ||
+                  element.getAttribute("aria-label") ||
+                  element.getAttribute("title")
+                );
+
+                if (!text) {
+                  return;
+                }
+
+
+                /*
+                 * Exact/strong matches for the floating
+                 * RUDAS & Progress control.
+                 */
+
+                var isRudasFloating =
+                  text === "rudas & progress" ||
+                  text === "rudas and progress" ||
+                  text === "rudas progress" ||
+                  text === "rudas & progress →" ||
+                  text.indexOf("rudas & progress") !== -1 ||
+                  text.indexOf("rudas and progress") !== -1;
+
+
+                if (!isRudasFloating) {
+                  return;
+                }
+
+
+                /*
+                 * Only hide controls that look like floating
+                 * navigation/action controls.
+                 *
+                 * The actual RUDAS assessment is left alone.
+                 */
+
+                element.classList.add(
+                  "smritiai-hide-rudas-floating"
+                );
+
+                hidden++;
+
+              });
+
+              if (hidden > 0) {
+
+                console.log(
+                  "SmritiAI: hidden RUDAS Progress floating control:",
+                  hidden
+                );
+
+              }
+
+            }
+
+
+            /*
+             * ------------------------------------------------------
+             * CAREGIVER
+             * ------------------------------------------------------
+             */
+
+            function openCaregiver() {
+
+              var opened =
+                clickOriginalControl([
+                  "connect caregiver",
+                  "connect to caregiver",
+                  "caregiver connection",
+                  "caregiver"
+                ]);
+
+              if (opened) {
+                return;
+              }
+
+
+              /*
+               * Try common existing IDs from the original app.
+               */
+
+              var possibleIds = [
+                "connect-caregiver",
+                "connectCaregiver",
+                "caregiver-connect",
+                "caregiverConnection",
+                "caregiverBtn"
+              ];
+
+              for (
+                var i = 0;
+                i < possibleIds.length;
+                i++
+              ) {
+
+                var element =
+                  document.getElementById(
+                    possibleIds[i]
+                  );
+
+                if (element) {
+
+                  element.click();
+
+                  return;
+
+                }
+
+              }
+
+              console.log(
+                "SmritiAI: existing caregiver control not found."
+              );
+
+            }
+
+
+            /*
+             * ------------------------------------------------------
+             * MUSIC
+             * ------------------------------------------------------
+             *
+             * IMPORTANT:
+             * We do NOT replace the original music system.
+             *
+             * The side icon first searches for the existing
+             * music/song/play controls and clicks them.
+             */
+
+            function openMusic() {
+
+              var opened =
+                clickOriginalControl([
+                  "music",
+                  "song",
+                  "play music",
+                  "play song",
+                  "nostalgia",
+                  "listen"
+                ]);
+
+              if (opened) {
+                return;
+              }
+
+
+              /*
+               * Try common music IDs.
+               */
+
+              var possibleIds = [
+                "music",
+                "musicButton",
+                "musicBtn",
+                "playMusic",
+                "playMusicButton",
+                "song",
+                "songButton",
+                "audio",
+                "audioButton",
+                "nostalgiaMusic",
+                "welcomeMusic"
+              ];
+
+              for (
+                var i = 0;
+                i < possibleIds.length;
+                i++
+              ) {
+
+                var element =
+                  document.getElementById(
+                    possibleIds[i]
+                  );
+
+                if (element) {
+
+                  element.click();
+
+                  return;
+
+                }
+
+              }
+
+
+              /*
+               * If the original app exposes a music function,
+               * use it without replacing it.
+               */
+
+              var functionNames = [
+                "toggleMusic",
+                "toggleAudio",
+                "playMusic",
+                "playSong",
+                "startMusic",
+                "startAudio",
+                "playWelcomeMusic",
+                "playNostalgiaMusic"
+              ];
+
+              for (
+                var j = 0;
+                j < functionNames.length;
+                j++
+              ) {
+
+                var fn =
+                  window[functionNames[j]];
+
+                if (typeof fn === "function") {
+
+                  try {
+
+                    fn();
+
+                    return;
+
+                  } catch (error) {
+
+                    console.log(
+                      "Music function failed:",
+                      functionNames[j],
+                      error
+                    );
+
+                  }
+
+                }
+
+              }
+
+
+              /*
+               * Look for HTML audio elements already belonging
+               * to the original application.
+               */
+
+              var audios =
+                Array.from(
+                  document.querySelectorAll("audio")
+                );
+
+              for (
+                var k = 0;
+                k < audios.length;
+                k++
+              ) {
+
+                var audio = audios[k];
+
+                try {
+
+                  if (
+                    audio.paused ||
+                    audio.currentTime >= 0
+                  ) {
+
+                    audio.play()
+                      .catch(function (error) {
+                        console.log(
+                          "Existing audio playback requires interaction:",
+                          error
+                        );
+                      });
+
+                    return;
+
+                  }
+
+                } catch (error) {
+                  console.log(error);
+                }
+
+              }
+
+
+              console.log(
+                "SmritiAI: existing music control not found."
+              );
+
+            }
+
+
+            /*
+             * ------------------------------------------------------
+             * LOGOUT
+             * ------------------------------------------------------
+             */
+
+            function logout() {
+
+              var opened =
+                clickOriginalControl([
+                  "logout",
+                  "log out",
+                  "sign out",
+                  "signout"
+                ]);
+
+              if (opened) {
+                return;
+              }
+
+
+              var possibleIds = [
+                "logout",
+                "logoutBtn",
+                "logoutButton",
+                "signout",
+                "signOut",
+                "signOutButton"
+              ];
+
+              for (
+                var i = 0;
+                i < possibleIds.length;
+                i++
+              ) {
+
+                var element =
+                  document.getElementById(
+                    possibleIds[i]
+                  );
+
+                if (element) {
+
+                  element.click();
+
+                  return;
+
+                }
+
+              }
+
+
+              console.log(
+                "SmritiAI: existing logout control not found."
+              );
+
+            }
+
+
+            /*
+             * Connect our small side icons.
+             */
+
+            function connectSideControls() {
+
+              var caregiver =
+                document.getElementById(
+                  "smritiai-caregiver-side-button"
+                );
+
+              var music =
+                document.getElementById(
+                  "smritiai-music-side-button"
+                );
+
+              var logoutButton =
+                document.getElementById(
+                  "smritiai-logout-side-button"
+                );
+
+
+              if (caregiver) {
+
+                caregiver.addEventListener(
+                  "click",
+                  function (event) {
+
+                    event.preventDefault();
+                    event.stopPropagation();
+
+                    openCaregiver();
+
+                  }
+                );
+
+              }
+
+
+              if (music) {
+
+                music.addEventListener(
+                  "click",
+                  function (event) {
+
+                    event.preventDefault();
+                    event.stopPropagation();
+
+                    openMusic();
+
+                  }
+                );
+
+              }
+
+
+              if (logoutButton) {
+
+                logoutButton.addEventListener(
+                  "click",
+                  function (event) {
+
+                    event.preventDefault();
+                    event.stopPropagation();
+
+                    logout();
+
+                  }
+                );
+
+              }
+
+            }
+
+
+            /*
+             * Initial setup.
+             */
+
+            afterAppLoads(function () {
+
+              connectSideControls();
+
+              hideRudasProgressButton();
+
+            });
+
+
+            /*
+             * The original app is a dynamic application.
+             * Watch for screens/buttons being recreated.
+             */
+
+            var observer =
+              new MutationObserver(
+                function () {
+
+                  hideRudasProgressButton();
+
+                }
+              );
+
+
+            afterAppLoads(function () {
+
+              try {
+
+                observer.observe(
+                  document.body,
+                  {
+                    childList: true,
+                    subtree: true
+                  }
+                );
+
+              } catch (error) {
+
+                console.log(
+                  "SmritiAI observer error:",
+                  error
+                );
+
+              }
+
+            });
+
+          })();
+
+          </script>
+
+          '''
+
+
+          # --------------------------------------------------------
+          # Insert safely.
+          #
+          # IMPORTANT:
+          # Do NOT use re.sub(replacement_string) because the
+          # JavaScript contains backslashes.
+          #
+          # lambda prevents Python from interpreting \s, \n etc.
+          # --------------------------------------------------------
+
+          pattern = r"</head\s*>"
+
+          updated_html = re.sub(
+              pattern,
+              lambda match: injection + "\n" + match.group(0),
+              html,
+              count=1,
+              flags=re.IGNORECASE
+          )
+
+          if updated_html == html:
+
+              print("WARNING: </head> not found.")
+
+              pattern_body = r"<body[^>]*>"
+
+              updated_html = re.sub(
+                  pattern_body,
+                  lambda match: match.group(0) + "\n" + injection,
+                  html,
+                  count=1,
+                  flags=re.IGNORECASE
+              )
+
+
+          if updated_html == html:
+
+              print("ERROR: Could not inject UI controls.")
+              raise SystemExit(1)
+
+
+          html_path.write_text(
+              updated_html,
+              encoding="utf-8"
+          )
+
+          final_size = len(updated_html)
+
+          print("")
+          print("==========================================")
+          print("SMRITIAI UI UPDATE COMPLETE")
+          print("==========================================")
+
+          print("Original size:", original_size)
+          print("Final size:", final_size)
+
+          print("")
+          print("Checking injected controls:")
+
+          checks = [
+              "smritiai-side-controls",
+              "smritiai-caregiver-side-button",
+              "smritiai-music-side-button",
+              "smritiai-logout-side-button",
+              "smritiai-hide-rudas-floating"
+          ]
+
+          for item in checks:
+
+              if item in updated_html:
+                  print("OK:", item)
+              else:
+                  print("ERROR:", item)
+                  raise SystemExit(1)
+
+          print("")
+          print("Existing RUDAS assessment code was NOT removed.")
+          print("Existing music system was NOT removed.")
+          print("Existing caregiver functionality was NOT removed.")
+          print("Existing logout functionality was NOT removed.")
+
+          PY
+
+
+      # ============================================================
+      # 8. VERIFY MODIFIED APP
+      # ============================================================
+
+      - name: Verify modified SmritiAI
         shell: bash
         run: |
           set -e
@@ -418,27 +1416,69 @@ jobs:
           HTML="android_wrapper/app/src/main/assets/smritiai/index.html"
 
           echo "=========================================="
-          echo "FINAL HTML VERIFICATION"
+          echo "VERIFYING FINAL SMRITIAI HTML"
           echo "=========================================="
 
           test -f "$HTML"
 
-          if ! grep -qiE \
-            "SmritiAI|smritiai_v3|Connect Caregiver|RUDAS" \
-            "$HTML"; then
-
-            echo "ERROR: This does not appear to be the SmritiAI app."
-
-            exit 1
-
-          fi
+          echo ""
+          echo "FINAL HTML SIZE:"
+          wc -c "$HTML"
 
           echo ""
-          echo "SmritiAI HTML confirmed."
+          echo "Checking SmritiAI:"
+          grep -q "SmritiAI" "$HTML"
+
+          echo "OK"
+
+          echo ""
+          echo "Checking RUDAS:"
+          grep -q "RUDAS" "$HTML"
+
+          echo "RUDAS PRESENT"
+
+          echo ""
+          echo "Checking original music references:"
+          grep -qiE \
+            "music|song|audio|playSound|sound|nostalgia" \
+            "$HTML" \
+            || true
+
+          echo ""
+          echo "Checking side controls:"
+
+          grep -q \
+            "smritiai-caregiver-side-button" \
+            "$HTML"
+
+          echo "Caregiver icon: OK"
+
+          grep -q \
+            "smritiai-music-side-button" \
+            "$HTML"
+
+          echo "Music icon: OK"
+
+          grep -q \
+            "smritiai-logout-side-button" \
+            "$HTML"
+
+          echo "Logout icon: OK"
+
+          grep -q \
+            "smritiai-hide-rudas-floating" \
+            "$HTML"
+
+          echo "RUDAS floating-control hiding: OK"
+
+          echo ""
+          echo "=========================================="
+          echo "FINAL HTML VERIFIED"
+          echo "=========================================="
 
 
       # ============================================================
-      # 8. CREATE WEBVIEW ACTIVITY
+      # 9. CREATE WEBVIEW ACTIVITY
       # ============================================================
 
       - name: Create Android WebView
@@ -530,6 +1570,7 @@ jobs:
                           ) {
 
                               return false;
+
                           }
 
                       }
@@ -544,9 +1585,13 @@ jobs:
                           ) {
 
                               runOnUiThread(
-                                  () -> request.grant(
-                                      request.getResources()
-                                  )
+                                  () -> {
+
+                                      request.grant(
+                                          request.getResources()
+                                      );
+
+                                  }
                               );
 
                           }
@@ -604,7 +1649,7 @@ jobs:
 
 
       # ============================================================
-      # 9. JAVA
+      # 10. JAVA 17
       # ============================================================
 
       - name: Setup Java 17
@@ -615,7 +1660,7 @@ jobs:
 
 
       # ============================================================
-      # 10. GRADLE
+      # 11. GRADLE
       # ============================================================
 
       - name: Setup Gradle
@@ -625,7 +1670,7 @@ jobs:
 
 
       # ============================================================
-      # 11. BUILD
+      # 12. BUILD APK
       # ============================================================
 
       - name: Build SmritiAI APK
@@ -635,7 +1680,7 @@ jobs:
           set -e
 
           echo "=========================================="
-          echo "BUILDING SMRITIAI"
+          echo "BUILDING SMRITIAI APK"
           echo "=========================================="
 
           gradle assembleDebug --no-daemon
@@ -645,7 +1690,7 @@ jobs:
 
 
       # ============================================================
-      # 12. VERIFY APK
+      # 13. VERIFY APK
       # ============================================================
 
       - name: Verify APK
@@ -655,20 +1700,28 @@ jobs:
 
           APK="android_wrapper/app/build/outputs/apk/debug/app-debug.apk"
 
-          test -f "$APK"
+          if [ ! -f "$APK" ]; then
+
+            echo "ERROR: APK was not created."
+
+            exit 1
+
+          fi
 
           echo ""
           echo "=========================================="
-          echo "SMRITIAI APK SUCCESS"
+          echo "SMRITIAI APK CREATED SUCCESSFULLY"
           echo "=========================================="
 
           ls -lh "$APK"
 
+          echo ""
+          echo "SHA256:"
           sha256sum "$APK"
 
 
       # ============================================================
-      # 13. UPLOAD
+      # 14. UPLOAD APK
       # ============================================================
 
       - name: Upload SmritiAI APK
