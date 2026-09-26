@@ -1,1079 +1,101 @@
-name: Build SmritiAI Final APK
+name: Build SmritiAI iOS
 
 on:
   workflow_dispatch:
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
+  build-ios:
+    runs-on: macos-15
 
     steps:
 
-      # --------------------------------------------------
-      # 1. Checkout
-      # --------------------------------------------------
+      # ============================================================
+      # 1. CHECKOUT
+      # ============================================================
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
 
-      # --------------------------------------------------
-      # 2. Extract original SmritiAI project
-      # --------------------------------------------------
+      # ============================================================
+      # 2. FIND AND EXTRACT SMRITIAI HTML
+      # ============================================================
+
       - name: Extract SmritiAI source
+        shell: bash
         run: |
+          set -e
+
           rm -rf smritiai_source
           mkdir -p smritiai_source
 
           unzip -q "SmritiAI_Source final.zip" -d smritiai_source
 
-          INDEX_FILE=$(find smritiai_source -type f -name "index.html" | head -n 1)
+          INDEX_FILE=$(find smritiai_source \
+            -type f \
+            -name "index.html" \
+            | head -n 1)
 
           if [ -z "$INDEX_FILE" ]; then
-            echo "ERROR: index.html not found"
+            echo "ERROR: index.html was not found."
             exit 1
           fi
 
-          echo "Using HTML:"
+          echo "Found SmritiAI:"
           echo "$INDEX_FILE"
 
           echo "INDEX_FILE=$INDEX_FILE" >> "$GITHUB_ENV"
 
 
-      # --------------------------------------------------
-      # 3. FINAL UI PATCH
-      # --------------------------------------------------
-      - name: Apply final SmritiAI interface
+      # ============================================================
+      # 3. CREATE IOS APP STRUCTURE
+      # ============================================================
+
+      - name: Create iOS application
+        shell: bash
         run: |
+          set -e
 
-          python3 <<'PY'
-          import os
-          import re
+          rm -rf SmritiAI-iOS
 
-          path = os.environ["INDEX_FILE"]
+          mkdir -p \
+            SmritiAI-iOS/SmritiAI.app
 
-          with open(path, "r", encoding="utf-8") as f:
-              html = f.read()
+          mkdir -p \
+            SmritiAI-iOS/Source
 
-          # ==========================================================
-          # FINAL SMRITIAI UI
-          # ==========================================================
 
-          patch = r'''
+      # ============================================================
+      # 4. COPY WEB APP INTO IOS BUNDLE
+      # ============================================================
 
-          <!-- ======================================================
-               SMRITIAI FINAL SIDE CONTROLS
-               ====================================================== -->
-
-          <style id="smritiai-final-controls">
-
-          /* --------------------------------------------------------
-             Hide ONLY the permanent RUDAS & Progress control
-             -------------------------------------------------------- */
-
-          .smritiai-hidden-rudas-progress {
-              display: none !important;
-              visibility: hidden !important;
-              opacity: 0 !important;
-              pointer-events: none !important;
-              width: 0 !important;
-              height: 0 !important;
-              overflow: hidden !important;
-          }
-
-
-          /* --------------------------------------------------------
-             Side control container
-             -------------------------------------------------------- */
-
-          #smritiai-side-controls {
-              position: fixed;
-              right: 16px;
-              bottom: 22px;
-
-              z-index: 2147483647;
-
-              display: flex;
-              flex-direction: column;
-              align-items: center;
-              gap: 12px;
-
-              pointer-events: auto;
-          }
-
-
-          /* --------------------------------------------------------
-             Individual circular logo buttons
-             -------------------------------------------------------- */
-
-          .smritiai-side-button {
-
-              width: 54px;
-              height: 54px;
-
-              border-radius: 50%;
-
-              border: 2px solid rgba(255,255,255,0.85);
-
-              background: rgba(37,99,235,0.96);
-
-              box-shadow:
-                  0 5px 18px rgba(0,0,0,0.25);
-
-              display: flex;
-              align-items: center;
-              justify-content: center;
-
-              cursor: pointer;
-
-              user-select: none;
-
-              font-family:
-                  Arial,
-                  Helvetica,
-                  sans-serif;
-
-              transition:
-                  transform 0.18s ease,
-                  box-shadow 0.18s ease;
-          }
-
-
-          .smritiai-side-button:hover {
-              transform: scale(1.08);
-
-              box-shadow:
-                  0 7px 22px rgba(0,0,0,0.30);
-          }
-
-
-          .smritiai-side-button:active {
-              transform: scale(0.94);
-          }
-
-
-          /* Caregiver logo */
-
-          #smritiai-caregiver-logo {
-
-              background:
-                  linear-gradient(
-                      135deg,
-                      #2563eb,
-                      #1d4ed8
-                  );
-          }
-
-
-          /* Music logo */
-
-          #smritiai-music-logo {
-
-              background:
-                  linear-gradient(
-                      135deg,
-                      #7c3aed,
-                      #5b21b6
-                  );
-          }
-
-
-          .smritiai-icon {
-              font-size: 27px;
-              line-height: 1;
-          }
-
-
-          /* --------------------------------------------------------
-             Music popup
-             -------------------------------------------------------- */
-
-          #smritiai-music-panel {
-
-              position: fixed;
-
-              right: 82px;
-              bottom: 22px;
-
-              width: 250px;
-
-              padding: 16px;
-
-              border-radius: 18px;
-
-              background: rgba(255,255,255,0.97);
-
-              box-shadow:
-                  0 10px 35px rgba(0,0,0,0.25);
-
-              border: 1px solid rgba(0,0,0,0.08);
-
-              z-index: 2147483646;
-
-              display: none;
-
-              font-family:
-                  Arial,
-                  Helvetica,
-                  sans-serif;
-          }
-
-
-          #smritiai-music-panel.open {
-              display: block;
-          }
-
-
-          #smritiai-music-title {
-
-              font-size: 16px;
-              font-weight: 700;
-
-              margin-bottom: 10px;
-
-              color: #1f2937;
-          }
-
-
-          #smritiai-music-controls {
-
-              display: flex;
-
-              align-items: center;
-
-              gap: 8px;
-          }
-
-
-          #smritiai-music-controls button {
-
-              border: none;
-
-              border-radius: 10px;
-
-              padding: 9px 13px;
-
-              background: #2563eb;
-
-              color: white;
-
-              font-weight: 600;
-
-              cursor: pointer;
-          }
-
-
-          #smritiai-music-volume {
-
-              width: 100%;
-
-              margin-top: 12px;
-          }
-
-
-          /* --------------------------------------------------------
-             Mobile
-             -------------------------------------------------------- */
-
-          @media (max-width: 600px) {
-
-              #smritiai-side-controls {
-                  right: 12px;
-                  bottom: 18px;
-                  gap: 9px;
-              }
-
-              .smritiai-side-button {
-                  width: 50px;
-                  height: 50px;
-              }
-
-              .smritiai-icon {
-                  font-size: 25px;
-              }
-
-              #smritiai-music-panel {
-                  right: 72px;
-                  bottom: 18px;
-                  width: 220px;
-              }
-          }
-
-          </style>
-
-
-          <div id="smritiai-side-controls">
-
-              <!-- CAREGIVER LOGO -->
-              <button
-                  id="smritiai-caregiver-logo"
-                  class="smritiai-side-button"
-                  type="button"
-                  aria-label="Connect caregiver"
-                  title="Connect Caregiver">
-
-                  <span class="smritiai-icon">👩‍⚕️</span>
-
-              </button>
-
-
-              <!-- MUSIC LOGO -->
-              <button
-                  id="smritiai-music-logo"
-                  class="smritiai-side-button"
-                  type="button"
-                  aria-label="Music"
-                  title="Music">
-
-                  <span class="smritiai-icon">🎵</span>
-
-              </button>
-
-          </div>
-
-
-          <!-- MUSIC PLAYER -->
-
-          <div id="smritiai-music-panel">
-
-              <div id="smritiai-music-title">
-                  🎵 SmritiAI Music
-              </div>
-
-              <div id="smritiai-music-controls">
-
-                  <button
-                      id="smritiai-music-play"
-                      type="button">
-                      ▶ Play
-                  </button>
-
-                  <button
-                      id="smritiai-music-stop"
-                      type="button">
-                      ■ Stop
-                  </button>
-
-              </div>
-
-              <input
-                  id="smritiai-music-volume"
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.05"
-                  value="0.7">
-
-          </div>
-
-
-          <script>
-
-          (function() {
-
-              "use strict";
-
-
-              /* =====================================================
-                 FIND ORIGINAL CONNECT CAREGIVER BUTTON
-                 ===================================================== */
-
-              function findOriginalCaregiverButton() {
-
-                  const elements =
-                      Array.from(
-                          document.querySelectorAll(
-                              "button, a, [role='button'], input, div"
-                          )
-                      );
-
-                  for (const el of elements) {
-
-                      if (!el ||
-                          el.id === "smritiai-caregiver-logo") {
-                          continue;
-                      }
-
-                      const text =
-                          (el.innerText ||
-                           el.textContent ||
-                           el.value ||
-                           "")
-                          .replace(/\s+/g, " ")
-                          .trim();
-
-                      /*
-                       * IMPORTANT:
-                       * Exact caregiver matching first.
-                       */
-
-                      if (/^connect caregiver$/i.test(text)) {
-
-                          return el;
-                      }
-                  }
-
-
-                  /*
-                   * Second-level matching.
-                   * Only use an element that clearly contains
-                   * "connect caregiver".
-                   */
-
-                  for (const el of elements) {
-
-                      if (!el ||
-                          el.id === "smritiai-caregiver-logo") {
-                          continue;
-                      }
-
-                      const text =
-                          (el.innerText ||
-                           el.textContent ||
-                           el.value ||
-                           "")
-                          .replace(/\s+/g, " ")
-                          .trim();
-
-                      if (
-                          text.length < 80 &&
-                          /connect\s+caregiver/i.test(text)
-                      ) {
-
-                          return el;
-                      }
-                  }
-
-                  return null;
-              }
-
-
-              /* =====================================================
-                 HIDE ORIGINAL CONNECT CAREGIVER UI
-                 ===================================================== */
-
-              function hideOriginalCaregiver() {
-
-                  const original =
-                      findOriginalCaregiverButton();
-
-                  if (!original) {
-                      return;
-                  }
-
-                  /*
-                   * Hide only the original clickable control.
-                   * Do NOT hide its entire page/card.
-                   */
-
-                  original.classList.add(
-                      "smritiai-original-caregiver-hidden"
-                  );
-
-                  original.style.setProperty(
-                      "display",
-                      "none",
-                      "important"
-                  );
-              }
-
-
-              /* =====================================================
-                 CAREGIVER ICON
-                 ===================================================== */
-
-              const caregiverLogo =
-                  document.getElementById(
-                      "smritiai-caregiver-logo"
-                  );
-
-
-              if (caregiverLogo) {
-
-                  caregiverLogo.addEventListener(
-                      "click",
-                      function() {
-
-                          const original =
-                              findOriginalCaregiverButton();
-
-                          if (original) {
-
-                              /*
-                               * Temporarily make it clickable
-                               * without changing the app logic.
-                               */
-
-                              original.style.setProperty(
-                                  "display",
-                                  "",
-                                  "important"
-                              );
-
-                              original.click();
-
-                              setTimeout(function() {
-
-                                  original.style.setProperty(
-                                      "display",
-                                      "none",
-                                      "important"
-                                  );
-
-                              }, 100);
-
-                          } else {
-
-                              /*
-                               * Do not create a fake caregiver system.
-                               * Tell the user the original control
-                               * could not be found.
-                               */
-
-                              alert(
-                                  "Caregiver connection is temporarily unavailable."
-                              );
-                          }
-
-                      }
-                  );
-
-              }
-
-
-              /* =====================================================
-                 MUSIC
-                 ===================================================== */
-
-              const musicLogo =
-                  document.getElementById(
-                      "smritiai-music-logo"
-                  );
-
-              const musicPanel =
-                  document.getElementById(
-                      "smritiai-music-panel"
-                  );
-
-              const playButton =
-                  document.getElementById(
-                      "smritiai-music-play"
-                  );
-
-              const stopButton =
-                  document.getElementById(
-                      "smritiai-music-stop"
-                  );
-
-              const volume =
-                  document.getElementById(
-                      "smritiai-music-volume"
-                  );
-
-
-              /*
-               * Existing welcome music is preserved.
-               * This creates a separate manual listener.
-               */
-
-              const music =
-                  new Audio(
-                      "assets/audio/welcome_nostalgia.wav"
-                  );
-
-              music.loop = true;
-              music.volume = 0.7;
-
-
-              if (musicLogo) {
-
-                  musicLogo.addEventListener(
-                      "click",
-                      function() {
-
-                          if (musicPanel) {
-
-                              musicPanel.classList.toggle(
-                                  "open"
-                              );
-
-                          }
-
-                      }
-                  );
-
-              }
-
-
-              if (playButton) {
-
-                  playButton.addEventListener(
-                      "click",
-                      async function() {
-
-                          try {
-
-                              await music.play();
-
-                              playButton.textContent =
-                                  "⏸ Playing";
-
-                          } catch (error) {
-
-                              console.log(
-                                  "Music playback:",
-                                  error
-                              );
-
-                              alert(
-                                  "Tap Play again to start the music."
-                              );
-
-                          }
-
-                      }
-                  );
-
-              }
-
-
-              if (stopButton) {
-
-                  stopButton.addEventListener(
-                      "click",
-                      function() {
-
-                          music.pause();
-
-                          music.currentTime = 0;
-
-                          if (playButton) {
-
-                              playButton.textContent =
-                                  "▶ Play";
-
-                          }
-
-                      }
-                  );
-
-              }
-
-
-              if (volume) {
-
-                  volume.addEventListener(
-                      "input",
-                      function() {
-
-                          music.volume =
-                              Number(volume.value);
-
-                      }
-                  );
-
-              }
-
-
-              /* =====================================================
-                 RUDAS & PROGRESS
-                 ===================================================== */
-
-              function hideOnlyRudasProgress() {
-
-                  const elements =
-                      Array.from(
-                          document.querySelectorAll(
-                              "button, a, [role='button'], div"
-                          )
-                      );
-
-
-                  for (const el of elements) {
-
-                      if (!el ||
-                          el.id === "smritiai-side-controls" ||
-                          el.id === "smritiai-caregiver-logo" ||
-                          el.id === "smritiai-music-logo") {
-
-                          continue;
-                      }
-
-
-                      const text =
-                          (el.innerText ||
-                           el.textContent ||
-                           "")
-                          .replace(/\s+/g, " ")
-                          .trim()
-                          .toLowerCase();
-
-
-                      /*
-                       * ONLY target the permanent
-                       * "RUDAS & Progress" control.
-                       *
-                       * Do NOT target:
-                       * - RUDAS assessment
-                       * - RUDAS questions
-                       * - RUDAS modal
-                       * - RUDAS result screen
-                       */
-
-                      const isRudasProgress =
-                          text === "rudas & progress" ||
-                          text === "rudas and progress" ||
-                          text === "rudas & progress →" ||
-                          text === "rudas and progress →";
-
-
-                      if (!isRudasProgress) {
-                          continue;
-                      }
-
-
-                      /*
-                       * Check if this is actually a floating /
-                       * bottom-right control.
-                       */
-
-                      const rect =
-                          el.getBoundingClientRect();
-
-                      const style =
-                          window.getComputedStyle(el);
-
-
-                      const isNearBottom =
-                          rect.bottom >
-                          window.innerHeight * 0.65;
-
-
-                      const isNearRight =
-                          rect.right >
-                          window.innerWidth * 0.55;
-
-
-                      const isFloating =
-                          style.position === "fixed" ||
-                          style.position === "absolute";
-
-
-                      if (
-                          (isNearBottom &&
-                           isNearRight) ||
-                          isFloating
-                      ) {
-
-                          el.classList.add(
-                              "smritiai-hidden-rudas-progress"
-                          );
-
-                      }
-
-                  }
-
-              }
-
-
-              /* =====================================================
-                 RUN PATCH
-                 ===================================================== */
-
-              function applyFinalUI() {
-
-                  hideOriginalCaregiver();
-
-                  hideOnlyRudasProgress();
-
-              }
-
-
-              /*
-               * Initial run
-               */
-
-              applyFinalUI();
-
-
-              /*
-               * App may dynamically redraw the interface.
-               * Watch it without touching the RUDAS assessment itself.
-               */
-
-              const observer =
-                  new MutationObserver(
-                      function() {
-
-                          applyFinalUI();
-
-                      }
-                  );
-
-
-              observer.observe(
-                  document.body,
-                  {
-                      childList: true,
-                      subtree: true
-                  }
-              );
-
-
-              /*
-               * Also retry after navigation / screen changes.
-               */
-
-              setInterval(
-                  applyFinalUI,
-                  1500
-              );
-
-
-          })();
-
-          </script>
-
-          '''
-
-          # Insert before </body>
-          if "</body>" in html.lower():
-
-              match = re.search(
-                  r"</body\s*>",
-                  html,
-                  flags=re.IGNORECASE
-              )
-
-              html = (
-                  html[:match.start()]
-                  + patch
-                  + html[match.start():]
-              )
-
-          else:
-
-              html += patch
-
-
-          with open(path, "w", encoding="utf-8") as f:
-              f.write(html)
-
-          print("Final SmritiAI UI patch applied.")
-          PY
-
-
-      # --------------------------------------------------
-      # 4. Create Android wrapper
-      # --------------------------------------------------
-      - name: Create Android project
-        run: |
-
-          rm -rf android_wrapper
-
-          mkdir -p android_wrapper/app/src/main/java/com/smritiai/app
-          mkdir -p android_wrapper/app/src/main/res/values
-          mkdir -p android_wrapper/app/src/main/assets/smritiai
-
-
-          cat > android_wrapper/settings.gradle <<'EOF'
-          pluginManagement {
-              repositories {
-                  google()
-                  mavenCentral()
-                  gradlePluginPortal()
-              }
-          }
-
-          dependencyResolutionManagement {
-              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
-
-              repositories {
-                  google()
-                  mavenCentral()
-              }
-          }
-
-          rootProject.name = "SmritiAI"
-
-          include(":app")
-          EOF
-
-
-          cat > android_wrapper/build.gradle <<'EOF'
-          plugins {
-              id "com.android.application" version "8.9.1" apply false
-          }
-          EOF
-
-
-          cat > android_wrapper/gradle.properties <<'EOF'
-          org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
-          android.useAndroidX=true
-          android.nonTransitiveRClass=true
-          EOF
-
-
-          cat > android_wrapper/app/build.gradle <<'EOF'
-          plugins {
-              id "com.android.application"
-          }
-
-          android {
-
-              namespace "com.smritiai.app"
-
-              compileSdk 35
-
-              defaultConfig {
-
-                  applicationId "com.smritiai.app"
-
-                  minSdk 23
-
-                  targetSdk 35
-
-                  versionCode 1
-
-                  versionName "1.0.0"
-              }
-
-              compileOptions {
-
-                  sourceCompatibility JavaVersion.VERSION_17
-
-                  targetCompatibility JavaVersion.VERSION_17
-              }
-          }
-          EOF
-
-
-          cat > android_wrapper/app/src/main/res/values/styles.xml <<'EOF'
-          <?xml version="1.0" encoding="utf-8"?>
-
-          <resources>
-
-              <style
-                  name="AppTheme"
-                  parent="android:style/Theme.Material.Light.NoActionBar">
-
-                  <item name="android:fontFamily">sans</item>
-
-                  <item name="android:windowActionModeOverlay">
-                      true
-                  </item>
-
-                  <item name="android:colorAccent">
-                      #2563EB
-                  </item>
-
-                  <item name="android:navigationBarColor">
-                      #FFFFFF
-                  </item>
-
-                  <item name="android:statusBarColor">
-                      #FFFFFF
-                  </item>
-
-                  <item name="android:windowLightStatusBar">
-                      true
-                  </item>
-
-              </style>
-
-          </resources>
-          EOF
-
-
-          cat > android_wrapper/app/src/main/AndroidManifest.xml <<'EOF'
-          <?xml version="1.0" encoding="utf-8"?>
-
-          <manifest
-              xmlns:android="http://schemas.android.com/apk/res/android">
-
-              <uses-permission
-                  android:name="android.permission.INTERNET" />
-
-              <uses-permission
-                  android:name="android.permission.ACCESS_NETWORK_STATE" />
-
-              <uses-permission
-                  android:name="android.permission.RECORD_AUDIO" />
-
-              <uses-permission
-                  android:name="android.permission.CAMERA" />
-
-
-              <application
-
-                  android:allowBackup="true"
-
-                  android:hardwareAccelerated="true"
-
-                  android:icon="@android:drawable/ic_menu_info_details"
-
-                  android:label="SmritiAI"
-
-                  android:resizeableActivity="true"
-
-                  android:usesCleartextTraffic="true"
-
-                  android:theme="@style/AppTheme">
-
-
-                  <activity
-
-                      android:name=".MainActivity"
-
-                      android:exported="true"
-
-                      android:screenOrientation="portrait">
-
-
-                      <intent-filter>
-
-                          <action
-                              android:name="android.intent.action.MAIN" />
-
-                          <category
-                              android:name="android.intent.category.LAUNCHER" />
-
-                      </intent-filter>
-
-                  </activity>
-
-              </application>
-
-          </manifest>
-          EOF
-
-
-      # --------------------------------------------------
-      # 5. Copy web application
-      # --------------------------------------------------
       - name: Copy SmritiAI web application
+        shell: bash
         run: |
+          set -e
 
           WEB_ROOT=$(dirname "$INDEX_FILE")
 
-          cp -R "$WEB_ROOT"/. \
-            android_wrapper/app/src/main/assets/smritiai/
+          echo "Copying web application:"
+          echo "$WEB_ROOT"
 
+          cp -R "$WEB_ROOT"/. \
+            SmritiAI-iOS/SmritiAI.app/
 
           test -f \
-            android_wrapper/app/src/main/assets/smritiai/index.html
+            SmritiAI-iOS/SmritiAI.app/index.html
+
+          echo "SmritiAI web application copied."
 
 
-          echo "Web application copied."
+      # ============================================================
+      # 5. PRESERVE MUSIC
+      # ============================================================
 
-
-      # --------------------------------------------------
-      # 6. Copy music asset if available
-      # --------------------------------------------------
       - name: Preserve SmritiAI music
+        shell: bash
         run: |
-
-          mkdir -p \
-            android_wrapper/app/src/main/assets/smritiai/assets/audio
+          set -e
 
           MUSIC_FILE=$(find smritiai_source \
             -type f \
@@ -1082,241 +104,456 @@ jobs:
 
           if [ -n "$MUSIC_FILE" ]; then
 
-              cp "$MUSIC_FILE" \
-                android_wrapper/app/src/main/assets/smritiai/assets/audio/welcome_nostalgia.wav
+            mkdir -p \
+              SmritiAI-iOS/SmritiAI.app/assets/audio
 
-              echo "Nostalgia music copied."
+            cp "$MUSIC_FILE" \
+              SmritiAI-iOS/SmritiAI.app/assets/audio/
+
+            echo "SmritiAI nostalgia music included."
 
           else
 
-              echo "welcome_nostalgia.wav not found."
-              echo "Existing HTML music will remain untouched."
+            echo "welcome_nostalgia.wav not found."
+            echo "Existing HTML music remains unchanged."
 
           fi
 
 
-      # --------------------------------------------------
-      # 7. Android WebView
-      # --------------------------------------------------
-      - name: Create WebView activity
+      # ============================================================
+      # 6. CREATE IOS WEBVIEW APP
+      # ============================================================
+
+      - name: Create WKWebView application
+        shell: bash
         run: |
 
-          cat > android_wrapper/app/src/main/java/com/smritiai/app/MainActivity.java <<'EOF'
-          package com.smritiai.app;
+          cat > SmritiAI-iOS/Source/main.swift <<'EOF'
 
-          import android.Manifest;
-          import android.app.Activity;
-          import android.os.Bundle;
-          import android.webkit.CookieManager;
-          import android.webkit.PermissionRequest;
-          import android.webkit.WebChromeClient;
-          import android.webkit.WebResourceRequest;
-          import android.webkit.WebSettings;
-          import android.webkit.WebView;
-          import android.webkit.WebViewClient;
+          import UIKit
+          import WebKit
+          import AVFoundation
 
-          public class MainActivity extends Activity {
+          final class ViewController:
+              UIViewController,
+              WKNavigationDelegate,
+              WKUIDelegate,
+              WKScriptMessageHandler,
+              WKDownloadDelegate {
 
-              private WebView webView;
+              private var webView: WKWebView!
 
-              @Override
-              protected void onCreate(Bundle savedInstanceState) {
+              override func viewDidLoad() {
 
-                  super.onCreate(savedInstanceState);
+                  super.viewDidLoad()
 
+                  view.backgroundColor = .white
 
-                  requestPermissions(
-                      new String[] {
-                          Manifest.permission.RECORD_AUDIO,
-                          Manifest.permission.CAMERA
-                      },
-                      1001
-                  );
+                  let configuration =
+                      WKWebViewConfiguration()
 
+                  configuration.allowsInlineMediaPlayback = true
 
-                  webView = new WebView(this);
+                  configuration.mediaTypesRequiringUserActionForPlayback = []
 
+                  configuration.preferences.javaScriptEnabled = true
 
-                  WebSettings settings =
-                      webView.getSettings();
+                  configuration.websiteDataStore =
+                      WKWebsiteDataStore.default()
 
+                  configuration.userContentController
+                      .add(
+                          self,
+                          name: "smritiai"
+                      )
 
-                  settings.setJavaScriptEnabled(true);
+                  webView =
+                      WKWebView(
+                          frame: .zero,
+                          configuration: configuration
+                      )
 
-                  settings.setDomStorageEnabled(true);
+                  webView.navigationDelegate = self
 
-                  settings.setDatabaseEnabled(true);
+                  webView.uiDelegate = self
 
-                  settings.setMediaPlaybackRequiresUserGesture(false);
+                  webView.translatesAutoresizingMaskIntoConstraints = false
 
-                  settings.setAllowFileAccess(true);
+                  view.addSubview(webView)
 
-                  settings.setAllowContentAccess(true);
+                  NSLayoutConstraint.activate([
 
-                  settings.setAllowFileAccessFromFileURLs(true);
+                      webView.leadingAnchor.constraint(
+                          equalTo: view.leadingAnchor
+                      ),
 
-                  settings.setAllowUniversalAccessFromFileURLs(true);
+                      webView.trailingAnchor.constraint(
+                          equalTo: view.trailingAnchor
+                      ),
 
-                  settings.setBuiltInZoomControls(false);
+                      webView.topAnchor.constraint(
+                          equalTo: view.topAnchor
+                      ),
 
-                  settings.setDisplayZoomControls(false);
+                      webView.bottomAnchor.constraint(
+                          equalTo: view.bottomAnchor
+                      )
 
-                  settings.setSupportZoom(false);
-
-                  settings.setLoadWithOverviewMode(false);
-
-                  settings.setUseWideViewPort(true);
-
-
-                  CookieManager
-                      .getInstance()
-                      .setAcceptCookie(true);
-
-
-                  CookieManager
-                      .getInstance()
-                      .setAcceptThirdPartyCookies(
-                          webView,
-                          true
-                      );
+                  ])
 
 
-                  webView.setWebViewClient(
-                      new WebViewClient() {
-
-                          @Override
-                          public boolean shouldOverrideUrlLoading(
-                              WebView view,
-                              WebResourceRequest request
-                          ) {
-
-                              return false;
-                          }
-                      }
-                  );
-
-
-                  webView.setWebChromeClient(
-                      new WebChromeClient() {
-
-                          @Override
-                          public void onPermissionRequest(
-                              final PermissionRequest request
-                          ) {
-
-                              runOnUiThread(() -> {
-
-                                  request.grant(
-                                      request.getResources()
-                                  );
-
-                              });
-                          }
-                      }
-                  );
-
-
-                  setContentView(webView);
-
-
-                  webView.loadUrl(
-                      "file:///android_asset/smritiai/index.html"
-                  );
+                  loadSmritiAI()
               }
 
 
-              @Override
-              public void onBackPressed() {
+              private func loadSmritiAI() {
 
-                  if (
-                      webView != null &&
-                      webView.canGoBack()
-                  ) {
+                  guard
+                      let url =
+                          Bundle.main.url(
+                              forResource: "index",
+                              withExtension: "html"
+                          )
+                  else {
 
-                      webView.goBack();
+                      print(
+                          "SmritiAI index.html not found"
+                      )
 
-                  } else {
-
-                      super.onBackPressed();
-                  }
-              }
-
-
-              @Override
-              protected void onDestroy() {
-
-                  if (webView != null) {
-
-                      webView.stopLoading();
-
-                      webView.destroy();
+                      return
                   }
 
-                  super.onDestroy();
+
+                  webView.loadFileURL(
+                      url,
+                      allowingReadAccessTo:
+                          Bundle.main.bundleURL
+                  )
               }
 
+
+              func userContentController(
+                  _ userContentController: WKUserContentController,
+                  didReceive message: WKScriptMessage
+              ) {
+
+                  print(
+                      "SmritiAI message:",
+                      message.body
+                  )
+              }
+
+
+              override var prefersStatusBarHidden: Bool {
+
+                  return false
+              }
+
+
+              override var preferredStatusBarStyle:
+                  UIStatusBarStyle {
+
+                  return .darkContent
+              }
+
+
+              override func viewDidAppear(
+                  _ animated: Bool
+              ) {
+
+                  super.viewDidAppear(animated)
+
+                  UIApplication.shared.isIdleTimerDisabled = false
+              }
+
+
+              deinit {
+
+                  webView?.configuration
+                      .userContentController
+                      .removeScriptMessageHandler(
+                          forName: "smritiai"
+                      )
+              }
           }
+
+
+          @main
+          final class AppDelegate:
+              UIResponder,
+              UIApplicationDelegate {
+
+              var window: UIWindow?
+
+              func application(
+                  _ application: UIApplication,
+                  didFinishLaunchingWithOptions
+                  launchOptions:
+                  [UIApplication.LaunchOptionsKey: Any]?
+              ) -> Bool {
+
+                  let window =
+                      UIWindow(
+                          frame:
+                              UIScreen.main.bounds
+                      )
+
+                  window.rootViewController =
+                      ViewController()
+
+                  self.window = window
+
+                  window.makeKeyAndVisible()
+
+                  return true
+              }
+          }
+
           EOF
 
 
-      # --------------------------------------------------
-      # 8. Java
-      # --------------------------------------------------
-      - name: Setup Java 17
-        uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: "17"
+      # ============================================================
+      # 7. COMPILE IOS APPLICATION
+      # ============================================================
+
+      - name: Compile iOS application
+        shell: bash
+        run: |
+          set -e
+
+          SDK=$(xcrun --sdk iphoneos --show-sdk-path)
+
+          xcrun swiftc \
+            -sdk "$SDK" \
+            -target arm64-apple-ios15.0 \
+            -framework UIKit \
+            -framework WebKit \
+            -framework AVFoundation \
+            -o SmritiAI-iOS/SmritiAI.app/SmritiAI \
+            SmritiAI-iOS/Source/main.swift
+
+          echo "iOS executable compiled."
 
 
-      # --------------------------------------------------
-      # 9. Gradle
-      # --------------------------------------------------
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: "8.14.3"
+      # ============================================================
+      # 8. CREATE INFO.PLIST
+      # ============================================================
 
-
-      # --------------------------------------------------
-      # 10. Build APK
-      # --------------------------------------------------
-      - name: Build final SmritiAI APK
-        working-directory: android_wrapper
+      - name: Create Info.plist
+        shell: bash
         run: |
 
-          gradle assembleDebug --no-daemon
+          cat > SmritiAI-iOS/SmritiAI.app/Info.plist <<'EOF'
+
+          <?xml version="1.0" encoding="UTF-8"?>
+
+          <!DOCTYPE plist PUBLIC
+          "-//Apple//DTD PLIST 1.0//EN"
+          "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+
+          <plist version="1.0">
+
+          <dict>
+
+              <key>CFBundleDisplayName</key>
+              <string>SmritiAI</string>
+
+              <key>CFBundleName</key>
+              <string>SmritiAI</string>
+
+              <key>CFBundleIdentifier</key>
+              <string>com.smritiai.app</string>
+
+              <key>CFBundleExecutable</key>
+              <string>SmritiAI</string>
+
+              <key>CFBundlePackageType</key>
+              <string>APPL</string>
+
+              <key>CFBundleShortVersionString</key>
+              <string>1.0.0</string>
+
+              <key>CFBundleVersion</key>
+              <string>1</string>
+
+              <key>LSRequiresIPhoneOS</key>
+              <true/>
+
+              <key>UILaunchStoryboardName</key>
+              <string>LaunchScreen</string>
+
+              <key>UIRequiredDeviceCapabilities</key>
+              <array>
+                  <string>arm64</string>
+              </array>
+
+              <key>UISupportedInterfaceOrientations</key>
+              <array>
+                  <string>UIInterfaceOrientationPortrait</string>
+              </array>
+
+              <key>NSCameraUsageDescription</key>
+              <string>
+                  SmritiAI uses the camera for cognitive assessment activities.
+              </string>
+
+              <key>NSMicrophoneUsageDescription</key>
+              <string>
+                  SmritiAI uses the microphone for voice interaction and speech activities.
+              </string>
+
+              <key>NSSpeechRecognitionUsageDescription</key>
+              <string>
+                  SmritiAI uses speech recognition for voice interaction.
+              </string>
+
+          </dict>
+
+          </plist>
+
+          EOF
 
 
-      # --------------------------------------------------
-      # 11. Verify
-      # --------------------------------------------------
-      - name: Verify APK
+      # ============================================================
+      # 9. CREATE LAUNCH SCREEN
+      # ============================================================
+
+      - name: Create launch screen
+        shell: bash
         run: |
 
-          APK="android_wrapper/app/build/outputs/apk/debug/app-debug.apk"
+          cat > SmritiAI-iOS/SmritiAI.app/LaunchScreen.storyboard <<'EOF'
 
-          test -f "$APK"
+          <?xml version="1.0" encoding="UTF-8"?>
 
-          echo ""
-          echo "=========================================="
-          echo "      SMRITIAI FINAL APK CREATED"
-          echo "=========================================="
+          <document
+              type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB"
+              version="3.0"
+              toolsVersion="21701"
+              targetRuntime="iOS.CocoaTouch"
+              propertyAccessControl="none"
+              useAutolayout="YES"
+              useTraitCollections="YES"
+              useSafeAreas="YES"
+              colorMatched="YES">
 
-          ls -lh "$APK"
+              <scenes>
+
+                  <scene
+                      sceneID="SmritiAI-Launch">
+
+                      <objects>
+
+                          <viewController
+                              id="SmritiAIViewController"
+                              sceneMemberID="viewController">
+
+                              <view
+                                  key="view"
+                                  contentMode="scaleToFill"
+                                  id="SmritiAIView">
+
+                                  <rect
+                                      key="frame"
+                                      x="0.0"
+                                      y="0.0"
+                                      width="390"
+                                      height="844"/>
+
+                                  <autoresizingMask
+                                      key="autoresizingMask"
+                                      widthSizable="YES"
+                                      heightSizable="YES"/>
+
+                                  <color
+                                      key="backgroundColor"
+                                      white="1.0"
+                                      alpha="1.0"
+                                      colorSpace="custom"
+                                      customColorSpace="genericGamma22GrayColorSpace"/>
+
+                              </view>
+
+                          </viewController>
+
+                          <placeholder
+                              placeholderIdentifier="IBFirstResponder"
+                              id="FirstResponder"
+                              sceneMemberID="firstResponder"/>
+
+                      </objects>
+
+                  </scene>
+
+              </scenes>
+
+          </document>
+
+          EOF
 
 
-      # --------------------------------------------------
-      # 12. Upload
-      # --------------------------------------------------
-      - name: Upload final APK
+      # ============================================================
+      # 10. AD-HOC SIGN FOR BUILD ARTIFACT
+      # ============================================================
+
+      - name: Ad hoc sign application
+        shell: bash
+        run: |
+
+          set -e
+
+          xcrun codesign \
+            --force \
+            --deep \
+            --sign - \
+            SmritiAI-iOS/SmritiAI.app
+
+          echo "Application bundle signed with temporary local signature."
+
+
+      # ============================================================
+      # 11. PACKAGE IPA
+      # ============================================================
+
+      - name: Create IPA
+        shell: bash
+        run: |
+
+          set -e
+
+          rm -rf SmritiAI-iOS/Payload
+
+          mkdir -p SmritiAI-iOS/Payload
+
+          cp -R \
+            SmritiAI-iOS/SmritiAI.app \
+            SmritiAI-iOS/Payload/SmritiAI.app
+
+          cd SmritiAI-iOS
+
+          zip -qry \
+            SmritiAI.ipa \
+            Payload
+
+          cd ..
+
+          ls -lh \
+            SmritiAI-iOS/SmritiAI.ipa
+
+
+      # ============================================================
+      # 12. UPLOAD IPA
+      # ============================================================
+
+      - name: Upload SmritiAI iOS
         uses: actions/upload-artifact@v4
 
         with:
 
-          name: SmritiAI-Final-APK
+          name: SmritiAI-iOS
 
-          path:
-            android_wrapper/app/build/outputs/apk/debug/app-debug.apk
+          path: |
+            SmritiAI-iOS/SmritiAI.ipa
+            SmritiAI-iOS/SmritiAI.app
 
           retention-days: 30
