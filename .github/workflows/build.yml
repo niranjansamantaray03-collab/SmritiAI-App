@@ -36,7 +36,6 @@ jobs:
 
           if [ ! -f "SmritiAI_Source final.zip" ]; then
             echo "ERROR: SmritiAI_Source final.zip not found."
-            echo "Make sure the ZIP is uploaded to the repository root."
             exit 1
           fi
 
@@ -58,13 +57,7 @@ jobs:
           unzip -q "SmritiAI_Source final.zip" \
             -d smritiai_source
 
-          echo ""
           echo "Searching for index.html..."
-
-          find smritiai_source \
-            -type f \
-            -name "index.html" \
-            -print
 
           INDEX_FILE=$(
             find smritiai_source \
@@ -78,7 +71,6 @@ jobs:
             exit 1
           fi
 
-          echo ""
           echo "Using:"
           echo "$INDEX_FILE"
 
@@ -103,16 +95,15 @@ jobs:
 
           test -f smritiai_web/index.html
 
-          echo ""
-          echo "SmritiAI HTML size:"
+          echo "HTML size:"
           wc -c smritiai_web/index.html
 
 
       # ============================================================
-      # 5. UPGRADE THE HTML APP
+      # 5. ADD MOBILE CONTROLS + ANDROID VOICE
       # ============================================================
 
-      - name: Add Android controls and mobile UI
+      - name: Upgrade SmritiAI mobile interface
         shell: bash
         run: |
 
@@ -129,21 +120,17 @@ jobs:
               errors="ignore"
           )
 
-          print(
-              "Original HTML size:",
-              len(html),
-              "characters"
-          )
+          print("Original HTML size:", len(html))
 
 
           # ========================================================
-          # MOBILE / LEFT SIDE CSS
+          # CSS
           # ========================================================
 
           css = r"""
 
           /* ========================================================
-             SMRITIAI ANDROID CONTROL BAR
+             SMRITIAI ANDROID CONTROLS
              ======================================================== */
 
           #smritiRudasLauncher {
@@ -153,22 +140,12 @@ jobs:
           }
 
 
-          /*
-           * Hide the old large caregiver button.
-           * The new small icon will use the same existing
-           * openConnectionPanel() function.
-           */
-
           #connectionFab {
               display: none !important;
               visibility: hidden !important;
               pointer-events: none !important;
           }
 
-
-          /* ========================================================
-             COMMON LEFT SIDE ICON
-             ======================================================== */
 
           #smritiCaregiverIcon,
           #smritiRudasIcon,
@@ -180,6 +157,7 @@ jobs:
               left: 12px;
 
               width: 48px;
+
               height: 48px;
 
               padding: 0;
@@ -233,94 +211,94 @@ jobs:
           }
 
 
-          /* ========================================================
-             ICON POSITIONS
-             ======================================================== */
+          /* CAREGIVER */
 
           #smritiCaregiverIcon {
 
               bottom: 222px;
 
-              background:
-                  #2563eb;
+              background: #2563eb;
 
           }
 
+
+          /* RUDAS */
 
           #smritiRudasIcon {
 
               bottom: 166px;
 
-              background:
-                  #4f46e5;
+              background: #4f46e5;
 
           }
 
+
+          /* MUSIC */
 
           #smritiMusicButton {
 
               bottom: 110px;
 
-              background:
-                  #0f766e;
+              background: #0f766e;
 
           }
 
+
+          /* LOGOUT */
 
           #smritiLogoutIcon {
 
               bottom: 54px;
 
-              background:
-                  #dc2626;
+              background: #dc2626;
 
           }
 
-
-          /* ========================================================
-             SAFE AREA
-             ======================================================== */
 
           @supports(padding: env(safe-area-inset-bottom)) {
 
               #smritiCaregiverIcon {
 
                   bottom:
-                      calc(222px +
-                      env(safe-area-inset-bottom));
+                      calc(
+                          222px +
+                          env(safe-area-inset-bottom)
+                      );
 
               }
 
               #smritiRudasIcon {
 
                   bottom:
-                      calc(166px +
-                      env(safe-area-inset-bottom));
+                      calc(
+                          166px +
+                          env(safe-area-inset-bottom)
+                      );
 
               }
 
               #smritiMusicButton {
 
                   bottom:
-                      calc(110px +
-                      env(safe-area-inset-bottom));
+                      calc(
+                          110px +
+                          env(safe-area-inset-bottom)
+                      );
 
               }
 
               #smritiLogoutIcon {
 
                   bottom:
-                      calc(54px +
-                      env(safe-area-inset-bottom));
+                      calc(
+                          54px +
+                          env(safe-area-inset-bottom)
+                      );
 
               }
 
           }
 
-
-          /* ========================================================
-             RUDAS OVERLAY
-             ======================================================== */
 
           #smritiRudasOverlay {
 
@@ -330,9 +308,25 @@ jobs:
           }
 
 
-          /* ========================================================
-             MOBILE RUDAS
-             ======================================================== */
+          html,
+          body {
+
+              overscroll-behavior-y:
+                  none;
+
+              -webkit-text-size-adjust:
+                  100%;
+
+          }
+
+
+          button {
+
+              -webkit-tap-highlight-color:
+                  transparent;
+
+          }
+
 
           @media(max-width:600px) {
 
@@ -362,43 +356,10 @@ jobs:
 
               }
 
-              .rg-game-option {
-
-                  min-height:
-                      60px !important;
-
-                  font-size:
-                      16px !important;
-
-              }
-
-          }
-
-
-          /* ========================================================
-             ANDROID WEBVIEW
-             ======================================================== */
-
-          html,
-          body {
-
-              overscroll-behavior-y:
-                  none;
-
-              -webkit-text-size-adjust:
-                  100%;
-
-          }
-
-
-          button {
-
-              -webkit-tap-highlight-color:
-                  transparent;
-
           }
 
           """
+
 
           if "</head>" in html:
 
@@ -434,24 +395,19 @@ jobs:
 
               function removeOldControls(){
 
-                  var ids = [
-
+                  [
                       "smritiCaregiverIcon",
                       "smritiRudasIcon",
                       "smritiMusicButton",
                       "smritiLogoutIcon"
+                  ].forEach(function(id){
 
-                  ];
-
-
-                  ids.forEach(function(id){
-
-                      var element =
+                      var old =
                           document.getElementById(id);
 
-                      if(element){
+                      if(old){
 
-                          element.remove();
+                          old.remove();
 
                       }
 
@@ -492,40 +448,52 @@ jobs:
 
 
               /* ====================================================
-                 CREATE ICON HELPER
+                 BUTTON CREATOR
                  ==================================================== */
 
               function makeButton(
                   id,
                   icon,
                   title,
-                  bottom,
                   handler
               ){
+
+                  if(
+                      document.getElementById(id)
+                  ){
+
+                      return;
+
+                  }
+
 
                   var button =
                       document.createElement(
                           "button"
                       );
 
-                  button.id = id;
+
+                  button.id =
+                      id;
+
 
                   button.type =
                       "button";
 
+
                   button.innerHTML =
                       icon;
 
+
                   button.title =
                       title;
+
 
                   button.setAttribute(
                       "aria-label",
                       title
                   );
 
-                  button.style.bottom =
-                      bottom + "px";
 
                   button.onclick =
                       function(event){
@@ -534,11 +502,11 @@ jobs:
 
                           event.stopPropagation();
 
-                          try{
+                          try {
 
                               handler();
 
-                          }catch(error){
+                          } catch(error) {
 
                               console.error(
                                   "SmritiAI control error:",
@@ -558,7 +526,7 @@ jobs:
 
 
               /* ====================================================
-                 CREATE LEFT SIDE CONTROLS
+                 CREATE CONTROLS
                  ==================================================== */
 
               function createControls(){
@@ -570,12 +538,42 @@ jobs:
                   }
 
 
-                  removeOldControls();
+                  /* Remove only old original buttons */
+
+                  var oldConnection =
+                      document.getElementById(
+                          "connectionFab"
+                      );
+
+                  if(oldConnection){
+
+                      oldConnection.remove();
+
+                  }
 
 
-                  /* ------------------------------------------------
+                  var oldRudas =
+                      document.getElementById(
+                          "smritiRudasLauncher"
+                      );
+
+                  if(oldRudas){
+
+                      oldRudas.style.display =
+                          "none";
+
+                      oldRudas.style.visibility =
+                          "hidden";
+
+                      oldRudas.style.pointerEvents =
+                          "none";
+
+                  }
+
+
+                  /* =================================================
                      CAREGIVER
-                     ------------------------------------------------ */
+                     ================================================= */
 
                   makeButton(
 
@@ -584,8 +582,6 @@ jobs:
                       "🔗",
 
                       "Connect Caregiver",
-
-                      222,
 
                       function(){
 
@@ -596,7 +592,7 @@ jobs:
 
                               window.openConnectionPanel();
 
-                          }else{
+                          } else {
 
                               alert(
                                   "Caregiver connection is unavailable."
@@ -609,9 +605,9 @@ jobs:
                   );
 
 
-                  /* ------------------------------------------------
+                  /* =================================================
                      RUDAS
-                     ------------------------------------------------ */
+                     ================================================= */
 
                   makeButton(
 
@@ -620,8 +616,6 @@ jobs:
                       "🧠",
 
                       "RUDAS Assessment",
-
-                      166,
 
                       function(){
 
@@ -642,11 +636,11 @@ jobs:
                                   "function"
                               ){
 
-                                  try{
+                                  try {
 
                                       window.refreshAll();
 
-                                  }catch(error){}
+                                  } catch(error) {}
 
                               }
 
@@ -654,10 +648,6 @@ jobs:
 
                           }
 
-
-                          /*
-                           * Fallback to original launcher
-                           */
 
                           var launcher =
                               document.getElementById(
@@ -675,7 +665,7 @@ jobs:
                               launcher.style.display =
                                   "none";
 
-                          }else{
+                          } else {
 
                               alert(
                                   "RUDAS assessment is unavailable."
@@ -688,9 +678,9 @@ jobs:
                   );
 
 
-                  /* ------------------------------------------------
+                  /* =================================================
                      MUSIC
-                     ------------------------------------------------ */
+                     ================================================= */
 
                   makeButton(
 
@@ -699,8 +689,6 @@ jobs:
                       "🎵",
 
                       "Music",
-
-                      110,
 
                       function(){
 
@@ -711,7 +699,7 @@ jobs:
 
                               window.toggleMusic();
 
-                          }else{
+                          } else {
 
                               alert(
                                   "Music is unavailable."
@@ -724,9 +712,9 @@ jobs:
                   );
 
 
-                  /* ------------------------------------------------
+                  /* =================================================
                      LOGOUT
-                     ------------------------------------------------ */
+                     ================================================= */
 
                   makeButton(
 
@@ -736,40 +724,37 @@ jobs:
 
                       "Logout",
 
-                      54,
-
                       function(){
 
-                          /*
-                           * Use the original application
-                           * logout route first.
-                           */
+                          /* Try original app logout */
 
                           if(
                               typeof window.go ===
                               "function"
                           ){
 
-                              try{
+                              try {
 
-                                  window.go("logout");
+                                  window.go(
+                                      "logout"
+                                  );
 
                                   return;
 
-                              }catch(error){
+                              } catch(error) {
 
-                                  console.error(error);
+                                  console.error(
+                                      error
+                                  );
 
                               }
 
                           }
 
 
-                          /*
-                           * Fallback.
-                           */
+                          /* Fallback */
 
-                          try{
+                          try {
 
                               if(
                                   typeof window.db !==
@@ -791,20 +776,22 @@ jobs:
 
                               }
 
-                          }catch(error){
+                          } catch(error) {
 
-                              console.error(error);
+                              console.error(
+                                  error
+                              );
 
                           }
 
 
-                          try{
+                          try {
 
                               localStorage.removeItem(
                                   "smritiai_session"
                               );
 
-                          }catch(error){}
+                          } catch(error) {}
 
 
                           location.reload();
@@ -817,52 +804,43 @@ jobs:
 
 
               /* ====================================================
-                 INSTALL CONTROLS
+                 INSTALL
                  ==================================================== */
 
               function install(){
 
-                  if(!document.body){
+                  if(
+                      document.body
+                  ){
 
-                      return;
+                      createControls();
 
                   }
-
-                  createControls();
 
               }
 
 
               /* ====================================================
-                 INITIAL BOOT
+                 BOOT
                  ==================================================== */
 
               function boot(){
 
                   install();
 
-
                   setTimeout(
                       install,
-                      300
+                      500
                   );
 
-
                   setTimeout(
                       install,
-                      1000
+                      1500
                   );
 
-
                   setTimeout(
                       install,
-                      2000
-                  );
-
-
-                  setTimeout(
-                      install,
-                      4000
+                      3000
                   );
 
               }
@@ -878,7 +856,7 @@ jobs:
                       boot
                   );
 
-              }else{
+              } else {
 
                   boot();
 
@@ -886,41 +864,48 @@ jobs:
 
 
               /* ====================================================
-                 PROTECT ICONS FROM APP RERENDERS
+                 APP RENDER PROTECTION
                  ==================================================== */
 
               var observer =
                   new MutationObserver(
                       function(){
 
-                          if(
+                          var missing =
+
                               !document.getElementById(
                                   "smritiCaregiverIcon"
                               ) ||
+
                               !document.getElementById(
                                   "smritiRudasIcon"
                               ) ||
+
                               !document.getElementById(
                                   "smritiMusicButton"
                               ) ||
+
                               !document.getElementById(
                                   "smritiLogoutIcon"
-                              )
-                          ){
+                              );
 
-                              install();
+
+                          if(missing){
+
+                              createControls();
 
                           }
 
 
-                          var old =
+                          var oldConnection =
                               document.getElementById(
                                   "connectionFab"
                               );
 
-                          if(old){
 
-                              old.remove();
+                          if(oldConnection){
+
+                              oldConnection.remove();
 
                           }
 
@@ -929,6 +914,7 @@ jobs:
                               document.getElementById(
                                   "smritiRudasLauncher"
                               );
+
 
                           if(oldRudas){
 
@@ -947,21 +933,21 @@ jobs:
                   );
 
 
-              try{
+              try {
 
                   observer.observe(
                       document.documentElement,
                       {
-                          childList:true,
-                          subtree:true
+                          childList: true,
+                          subtree: true
                       }
                   );
 
-              }catch(error){}
+              } catch(error) {}
 
 
               /* ====================================================
-                 NATIVE ANDROID TEXT TO SPEECH
+                 NATIVE ANDROID TTS
                  ==================================================== */
 
               var originalSpeak =
@@ -971,7 +957,7 @@ jobs:
               window.speak =
                   function(text){
 
-                      try{
+                      try {
 
                           if(
                               window.SmritiNative &&
@@ -983,7 +969,7 @@ jobs:
                                   "en-IN";
 
 
-                              try{
+                              try {
 
                                   if(
                                       typeof window.db !==
@@ -1000,9 +986,7 @@ jobs:
                                           language =
                                               "hi-IN";
 
-                                      }
-
-                                      else if(
+                                      } else if(
                                           window.db.active.language
                                           === "mr"
                                       ){
@@ -1014,11 +998,13 @@ jobs:
 
                                   }
 
-                              }catch(error){}
+                              } catch(error) {}
 
 
                               window.SmritiNative.speak(
-                                  String(text || ""),
+                                  String(
+                                      text || ""
+                                  ),
                                   language
                               );
 
@@ -1026,23 +1012,23 @@ jobs:
 
                           }
 
-                      }catch(error){
+                      } catch(error) {
 
-                          console.error(error);
+                          console.error(
+                              error
+                          );
 
                       }
 
-
-                      /*
-                       * Browser fallback
-                       */
 
                       if(
                           typeof originalSpeak ===
                           "function"
                       ){
 
-                          originalSpeak(text);
+                          originalSpeak(
+                              text
+                          );
 
                       }
 
@@ -1050,13 +1036,13 @@ jobs:
 
 
               /* ====================================================
-                 NATIVE ANDROID SPEECH RECOGNITION
+                 NATIVE ANDROID SPEECH
                  ==================================================== */
 
               window.smritiAndroidVoice =
                   function(){
 
-                      try{
+                      try {
 
                           if(
                               window.SmritiNative &&
@@ -1068,7 +1054,7 @@ jobs:
                                   "en-IN";
 
 
-                              try{
+                              try {
 
                                   if(
                                       typeof window.db !==
@@ -1085,9 +1071,7 @@ jobs:
                                           language =
                                               "hi-IN";
 
-                                      }
-
-                                      else if(
+                                      } else if(
                                           window.db.active.language
                                           === "mr"
                                       ){
@@ -1099,22 +1083,26 @@ jobs:
 
                                   }
 
-                              }catch(error){}
+                              } catch(error) {}
 
 
                               window.SmritiNative.startListening(
                                   language
                               );
 
+
                               return true;
 
                           }
 
-                      }catch(error){
+                      } catch(error) {
 
-                          console.error(error);
+                          console.error(
+                              error
+                          );
 
                       }
+
 
                       return false;
 
@@ -1122,14 +1110,16 @@ jobs:
 
 
               /* ====================================================
-                 NATIVE SPEECH RESULT
+                 SPEECH RESULT
                  ==================================================== */
 
               window.__smritiSpeechResult =
                   function(text){
 
                       var value =
-                          String(text || "")
+                          String(
+                              text || ""
+                          )
                           .trim()
                           .toLowerCase();
 
@@ -1147,9 +1137,7 @@ jobs:
                       );
 
 
-                      /*
-                       * Games
-                       */
+                      /* Games */
 
                       if(
                           value.includes("game") ||
@@ -1162,7 +1150,9 @@ jobs:
                               "function"
                           ){
 
-                              window.go("games");
+                              window.go(
+                                  "games"
+                              );
 
                               return;
 
@@ -1171,9 +1161,7 @@ jobs:
                       }
 
 
-                      /*
-                       * Stories
-                       */
+                      /* Stories */
 
                       if(
                           value.includes("story") ||
@@ -1186,7 +1174,9 @@ jobs:
                               "function"
                           ){
 
-                              window.go("stories");
+                              window.go(
+                                  "stories"
+                              );
 
                               return;
 
@@ -1195,9 +1185,7 @@ jobs:
                       }
 
 
-                      /*
-                       * Memory
-                       */
+                      /* Memory */
 
                       if(
                           value.includes("memory") ||
@@ -1210,7 +1198,9 @@ jobs:
                               "function"
                           ){
 
-                              window.go("album");
+                              window.go(
+                                  "album"
+                              );
 
                               return;
 
@@ -1219,9 +1209,7 @@ jobs:
                       }
 
 
-                      /*
-                       * Reminders
-                       */
+                      /* Reminders */
 
                       if(
                           value.includes("reminder") ||
@@ -1234,7 +1222,9 @@ jobs:
                               "function"
                           ){
 
-                              window.go("reminders");
+                              window.go(
+                                  "reminders"
+                              );
 
                               return;
 
@@ -1243,9 +1233,7 @@ jobs:
                       }
 
 
-                      /*
-                       * Summary
-                       */
+                      /* Summary */
 
                       if(
                           value.includes("summary")
@@ -1256,7 +1244,9 @@ jobs:
                               "function"
                           ){
 
-                              window.go("summary");
+                              window.go(
+                                  "summary"
+                              );
 
                               return;
 
@@ -1265,9 +1255,7 @@ jobs:
                       }
 
 
-                      /*
-                       * Otherwise repeat what was heard.
-                       */
+                      /* Generic response */
 
                       if(
                           typeof window.speak ===
@@ -1275,7 +1263,8 @@ jobs:
                       ){
 
                           window.speak(
-                              "I heard " + value
+                              "I heard " +
+                              value
                           );
 
                       }
@@ -1284,7 +1273,7 @@ jobs:
 
 
               /* ====================================================
-                 VOICE COMMAND OVERRIDE
+                 VOICE COMMAND
                  ==================================================== */
 
               var originalVoiceCommand =
@@ -1293,10 +1282,6 @@ jobs:
 
               window.voiceCommand =
                   function(){
-
-                      /*
-                       * Android native voice first.
-                       */
 
                       if(
                           typeof window.smritiAndroidVoice ===
@@ -1313,10 +1298,6 @@ jobs:
 
                       }
 
-
-                      /*
-                       * Browser speech fallback.
-                       */
 
                       if(
                           typeof originalVoiceCommand ===
@@ -1358,29 +1339,23 @@ jobs:
 
           print(
               "Updated HTML size:",
-              len(html),
-              "characters"
+              len(html)
           )
 
           PY
 
 
       # ============================================================
-      # 6. VERIFY APP FEATURES
+      # 6. VERIFY HTML
       # ============================================================
 
-      - name: Verify SmritiAI features
+      - name: Verify SmritiAI application
         shell: bash
         run: |
 
           set -e
 
           HTML="smritiai_web/index.html"
-
-          echo "======================================"
-          echo "VERIFYING SMRITIAI"
-          echo "======================================"
-
 
           test -f "$HTML"
 
@@ -1392,11 +1367,6 @@ jobs:
             "$HTML"
 
 
-          grep -q \
-            "smritiRudasLauncher" \
-            "$HTML"
-
-
           echo "Checking caregiver..."
 
           grep -q \
@@ -1404,7 +1374,7 @@ jobs:
             "$HTML"
 
 
-          echo "Checking new controls..."
+          echo "Checking controls..."
 
           grep -q \
             "smritiCaregiverIcon" \
@@ -1423,7 +1393,7 @@ jobs:
             "$HTML"
 
 
-          echo "Checking voice..."
+          echo "Checking Android voice..."
 
           grep -q \
             "SmritiNative" \
@@ -1431,7 +1401,9 @@ jobs:
 
 
           echo ""
-          echo "ALL SMRITIAI FEATURES VERIFIED."
+          echo "======================================"
+          echo "SMRITIAI HTML VERIFIED"
+          echo "======================================"
 
 
       # ============================================================
@@ -1486,7 +1458,6 @@ jobs:
                   RepositoriesMode.FAIL_ON_PROJECT_REPOS
               )
 
-
               repositories {
 
                   google()
@@ -1509,16 +1480,13 @@ jobs:
 
           # --------------------------------------------------------
           # ROOT BUILD
+          # IMPORTANT: CORRECT GRADLE SYNTAX
           # --------------------------------------------------------
 
           cat > android_wrapper/build.gradle <<'EOF'
 
           plugins {
-
-              id 'com.android.application'
-                  version '8.9.1'
-                  apply false
-
+              id 'com.android.application' version '8.9.1' apply false
           }
 
           EOF
@@ -1548,9 +1516,7 @@ jobs:
           cat > android_wrapper/app/build.gradle <<'EOF'
 
           plugins {
-
               id 'com.android.application'
-
           }
 
 
@@ -1602,11 +1568,17 @@ jobs:
           EOF
 
 
-          # --------------------------------------------------------
-          # STYLES
-          # --------------------------------------------------------
+      # ============================================================
+      # 8. ANDROID THEME
+      # ============================================================
 
-          cat > android_wrapper/app/src/main/res/values/styles.xml <<'EOF'
+      - name: Create Android theme
+        shell: bash
+        run: |
+
+          cat > \
+          android_wrapper/app/src/main/res/values/styles.xml \
+          <<'EOF'
 
           <?xml version="1.0" encoding="utf-8"?>
 
@@ -1648,14 +1620,16 @@ jobs:
 
 
       # ============================================================
-      # 8. ANDROID MANIFEST
+      # 9. ANDROID MANIFEST
       # ============================================================
 
       - name: Create Android manifest
         shell: bash
         run: |
 
-          cat > android_wrapper/app/src/main/AndroidManifest.xml <<'EOF'
+          cat > \
+          android_wrapper/app/src/main/AndroidManifest.xml \
+          <<'EOF'
 
           <?xml version="1.0" encoding="utf-8"?>
 
@@ -1711,7 +1685,6 @@ jobs:
 
                   </activity>
 
-
               </application>
 
 
@@ -1721,7 +1694,7 @@ jobs:
 
 
       # ============================================================
-      # 9. COPY HTML APP INTO ANDROID
+      # 10. COPY WEB APP
       # ============================================================
 
       - name: Copy SmritiAI into Android assets
@@ -1739,14 +1712,14 @@ jobs:
             android_wrapper/app/src/main/assets/smritiai/index.html
 
 
-          echo "SmritiAI successfully copied."
+          echo "SmritiAI web application copied."
 
 
       # ============================================================
-      # 10. CREATE NATIVE ANDROID BRIDGE
+      # 11. CREATE NATIVE ANDROID BRIDGE
       # ============================================================
 
-      - name: Create Android native bridge
+      - name: Create native Android voice bridge
         shell: bash
         run: |
 
@@ -1808,10 +1781,6 @@ jobs:
                   PERMISSION_REQUEST = 1001;
 
 
-              /* ====================================================
-                 CREATE
-                 ==================================================== */
-
               @Override
 
               protected void onCreate(
@@ -1837,7 +1806,6 @@ jobs:
                  ==================================================== */
 
               private void initializeWebView() {
-
 
                   webView =
                       new WebView(this);
@@ -1888,16 +1856,6 @@ jobs:
 
 
                   settings.setSupportZoom(
-                      false
-                  );
-
-
-                  settings.setLoadWithOverviewMode(
-                      false
-                  );
-
-
-                  settings.setUseWideViewPort(
                       false
                   );
 
@@ -2044,10 +2002,15 @@ jobs:
 
 
                   tts.speak(
+
                       text,
+
                       TextToSpeech.QUEUE_FLUSH,
+
                       null,
+
                       "smritiai"
+
                   );
 
               }
@@ -2060,7 +2023,6 @@ jobs:
               private void startListening(
                   String language
               ) {
-
 
                   if(
                       !SpeechRecognizer
@@ -2102,6 +2064,7 @@ jobs:
 
                   speechRecognizer
                       .setRecognitionListener(
+
                           new RecognitionListener() {
 
 
@@ -2190,6 +2153,7 @@ jobs:
                               ) {}
 
                           }
+
                       );
 
 
@@ -2248,13 +2212,12 @@ jobs:
 
 
               /* ====================================================
-                 SEND SPEECH TO JAVASCRIPT
+                 JAVASCRIPT RESULT
                  ==================================================== */
 
               private void sendSpeechResult(
                   String text
               ) {
-
 
                   if(webView == null)
                       return;
@@ -2349,7 +2312,6 @@ jobs:
 
               private void requestPermissionsIfNeeded() {
 
-
                   if(
                       android.os.Build.VERSION.SDK_INT
                       < 23
@@ -2413,13 +2375,12 @@ jobs:
 
 
               /* ====================================================
-                 BACK BUTTON
+                 BACK
                  ==================================================== */
 
               @Override
 
               public void onBackPressed() {
-
 
                   if(
                       webView != null &&
@@ -2444,7 +2405,6 @@ jobs:
               @Override
 
               protected void onDestroy() {
-
 
                   if(
                       speechRecognizer != null
@@ -2497,7 +2457,7 @@ jobs:
 
 
       # ============================================================
-      # 11. SETUP JAVA 17
+      # 12. JAVA 17
       # ============================================================
 
       - name: Setup Java 17
@@ -2508,7 +2468,7 @@ jobs:
 
 
       # ============================================================
-      # 12. SETUP GRADLE
+      # 13. GRADLE 8.14.3
       # ============================================================
 
       - name: Setup Gradle
@@ -2518,10 +2478,10 @@ jobs:
 
 
       # ============================================================
-      # 13. BUILD APK
+      # 14. BUILD APK
       # ============================================================
 
-      - name: Build SmritiAI Debug APK
+      - name: Build SmritiAI APK
         working-directory: android_wrapper
         shell: bash
         run: |
@@ -2532,6 +2492,7 @@ jobs:
           echo "BUILDING SMRITIAI APK"
           echo "======================================"
 
+
           gradle \
             assembleDebug \
             --no-daemon \
@@ -2539,7 +2500,7 @@ jobs:
 
 
       # ============================================================
-      # 14. VERIFY APK
+      # 15. VERIFY APK
       # ============================================================
 
       - name: Verify APK
@@ -2568,9 +2529,11 @@ jobs:
           echo "SMRITIAI APK CREATED"
           echo "======================================"
 
+
           ls -lh "$APK"
 
-          echo "APK bytes: $SIZE"
+
+          echo "APK size: $SIZE bytes"
 
 
           if [ "$SIZE" -lt 100000 ]; then
@@ -2586,10 +2549,10 @@ jobs:
 
 
       # ============================================================
-      # 15. RENAME APK
+      # 16. RENAME
       # ============================================================
 
-      - name: Create final APK
+      - name: Create final SmritiAI APK
         shell: bash
         run: |
 
@@ -2602,7 +2565,7 @@ jobs:
 
 
       # ============================================================
-      # 16. UPLOAD FINAL APK
+      # 17. UPLOAD APK
       # ============================================================
 
       - name: Upload SmritiAI APK
@@ -2617,7 +2580,7 @@ jobs:
 
 
       # ============================================================
-      # 17. BUILD DIAGNOSTICS
+      # 18. DIAGNOSTICS
       # ============================================================
 
       - name: Upload diagnostics if build fails
