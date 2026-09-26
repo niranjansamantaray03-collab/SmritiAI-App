@@ -15,7 +15,7 @@ jobs:
         run: |
           rm -rf smritiai_build
           mkdir smritiai_build
-          unzip -q SmritiAI_Source.zip -d smritiai_build
+          unzip -q "SmritiAI_Source final.zip" -d smritiai_build
 
           test -f smritiai_build/pubspec.yaml
           test -d smritiai_build/lib
