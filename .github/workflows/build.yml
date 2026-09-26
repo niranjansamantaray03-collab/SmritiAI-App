@@ -18,7 +18,7 @@ jobs:
 
 
       # ============================================================
-      # 2. FIND AND EXTRACT SMRITIAI HTML
+      # 2. EXTRACT SMRITIAI SOURCE
       # ============================================================
 
       - name: Extract SmritiAI source
@@ -41,14 +41,16 @@ jobs:
             exit 1
           fi
 
-          echo "Found SmritiAI:"
+          echo "=========================================="
+          echo "SmritiAI HTML found:"
           echo "$INDEX_FILE"
+          echo "=========================================="
 
           echo "INDEX_FILE=$INDEX_FILE" >> "$GITHUB_ENV"
 
 
       # ============================================================
-      # 3. CREATE IOS APP STRUCTURE
+      # 3. CREATE IOS PROJECT
       # ============================================================
 
       - name: Create iOS application
@@ -58,15 +60,12 @@ jobs:
 
           rm -rf SmritiAI-iOS
 
-          mkdir -p \
-            SmritiAI-iOS/SmritiAI.app
-
-          mkdir -p \
-            SmritiAI-iOS/Source
+          mkdir -p SmritiAI-iOS/SmritiAI.app
+          mkdir -p SmritiAI-iOS/Source
 
 
       # ============================================================
-      # 4. COPY WEB APP INTO IOS BUNDLE
+      # 4. COPY WEB APPLICATION
       # ============================================================
 
       - name: Copy SmritiAI web application
@@ -76,7 +75,7 @@ jobs:
 
           WEB_ROOT=$(dirname "$INDEX_FILE")
 
-          echo "Copying web application:"
+          echo "Copying:"
           echo "$WEB_ROOT"
 
           cp -R "$WEB_ROOT"/. \
@@ -85,7 +84,7 @@ jobs:
           test -f \
             SmritiAI-iOS/SmritiAI.app/index.html
 
-          echo "SmritiAI web application copied."
+          echo "Web application copied successfully."
 
 
       # ============================================================
@@ -115,33 +114,76 @@ jobs:
           else
 
             echo "welcome_nostalgia.wav not found."
-            echo "Existing HTML music remains unchanged."
+            echo "Existing HTML music remains untouched."
 
           fi
 
 
       # ============================================================
-      # 6. CREATE IOS WEBVIEW APP
+      # 6. CREATE APP DELEGATE
       # ============================================================
 
-      - name: Create WKWebView application
+      - name: Create AppDelegate
         shell: bash
         run: |
 
-          cat > SmritiAI-iOS/Source/main.swift <<'EOF'
+          cat > SmritiAI-iOS/Source/AppDelegate.swift <<'EOF'
+
+          import UIKit
+
+          final class AppDelegate:
+              UIResponder,
+              UIApplicationDelegate {
+
+              var window: UIWindow?
+
+              func application(
+                  _ application: UIApplication,
+                  didFinishLaunchingWithOptions
+                  launchOptions:
+                  [UIApplication.LaunchOptionsKey: Any]?
+              ) -> Bool {
+
+                  let window =
+                      UIWindow(
+                          frame: UIScreen.main.bounds
+                      )
+
+                  window.rootViewController =
+                      ViewController()
+
+                  self.window = window
+
+                  window.makeKeyAndVisible()
+
+                  return true
+              }
+          }
+
+          EOF
+
+
+      # ============================================================
+      # 7. CREATE WEBVIEW CONTROLLER
+      # ============================================================
+
+      - name: Create ViewController
+        shell: bash
+        run: |
+
+          cat > SmritiAI-iOS/Source/ViewController.swift <<'EOF'
 
           import UIKit
           import WebKit
-          import AVFoundation
 
           final class ViewController:
               UIViewController,
               WKNavigationDelegate,
               WKUIDelegate,
-              WKScriptMessageHandler,
-              WKDownloadDelegate {
+              WKScriptMessageHandler {
 
               private var webView: WKWebView!
+
 
               override func viewDidLoad() {
 
@@ -149,17 +191,27 @@ jobs:
 
                   view.backgroundColor = .white
 
+
                   let configuration =
                       WKWebViewConfiguration()
 
-                  configuration.allowsInlineMediaPlayback = true
 
-                  configuration.mediaTypesRequiringUserActionForPlayback = []
+                  configuration.allowsInlineMediaPlayback =
+                      true
 
-                  configuration.preferences.javaScriptEnabled = true
+
+                  if #available(iOS 10.0, *) {
+
+                      configuration
+                          .mediaTypesRequiringUserActionForPlayback =
+                          []
+
+                  }
+
 
                   configuration.websiteDataStore =
                       WKWebsiteDataStore.default()
+
 
                   configuration.userContentController
                       .add(
@@ -167,19 +219,26 @@ jobs:
                           name: "smritiai"
                       )
 
+
                   webView =
                       WKWebView(
                           frame: .zero,
                           configuration: configuration
                       )
 
-                  webView.navigationDelegate = self
 
-                  webView.uiDelegate = self
+                  webView.navigationDelegate =
+                      self
 
-                  webView.translatesAutoresizingMaskIntoConstraints = false
+                  webView.uiDelegate =
+                      self
+
+                  webView.translatesAutoresizingMaskIntoConstraints =
+                      false
+
 
                   view.addSubview(webView)
+
 
                   NSLayoutConstraint.activate([
 
@@ -217,7 +276,7 @@ jobs:
                   else {
 
                       print(
-                          "SmritiAI index.html not found"
+                          "ERROR: index.html not found"
                       )
 
                       return
@@ -233,8 +292,10 @@ jobs:
 
 
               func userContentController(
-                  _ userContentController: WKUserContentController,
-                  didReceive message: WKScriptMessage
+                  _ userContentController:
+                      WKUserContentController,
+                  didReceive message:
+                      WKScriptMessage
               ) {
 
                   print(
@@ -244,32 +305,18 @@ jobs:
               }
 
 
-              override var prefersStatusBarHidden: Bool {
-
-                  return false
-              }
-
-
-              override var preferredStatusBarStyle:
+              override var
+                  preferredStatusBarStyle:
                   UIStatusBarStyle {
 
                   return .darkContent
               }
 
 
-              override func viewDidAppear(
-                  _ animated: Bool
-              ) {
-
-                  super.viewDidAppear(animated)
-
-                  UIApplication.shared.isIdleTimerDisabled = false
-              }
-
-
               deinit {
 
-                  webView?.configuration
+                  webView?
+                      .configuration
                       .userContentController
                       .removeScriptMessageHandler(
                           forName: "smritiai"
@@ -277,66 +324,33 @@ jobs:
               }
           }
 
+          EOF
 
-          @main
-          final class AppDelegate:
-              UIResponder,
-              UIApplicationDelegate {
 
-              var window: UIWindow?
+      # ============================================================
+      # 8. CREATE MAIN
+      # ============================================================
 
-              func application(
-                  _ application: UIApplication,
-                  didFinishLaunchingWithOptions
-                  launchOptions:
-                  [UIApplication.LaunchOptionsKey: Any]?
-              ) -> Bool {
+      - name: Create main
+        shell: bash
+        run: |
 
-                  let window =
-                      UIWindow(
-                          frame:
-                              UIScreen.main.bounds
-                      )
+          cat > SmritiAI-iOS/Source/main.swift <<'EOF'
 
-                  window.rootViewController =
-                      ViewController()
+          import UIKit
 
-                  self.window = window
-
-                  window.makeKeyAndVisible()
-
-                  return true
-              }
-          }
+          UIApplicationMain(
+              CommandLine.argc,
+              CommandLine.unsafeArgv,
+              nil,
+              NSStringFromClass(AppDelegate.self)
+          )
 
           EOF
 
 
       # ============================================================
-      # 7. COMPILE IOS APPLICATION
-      # ============================================================
-
-      - name: Compile iOS application
-        shell: bash
-        run: |
-          set -e
-
-          SDK=$(xcrun --sdk iphoneos --show-sdk-path)
-
-          xcrun swiftc \
-            -sdk "$SDK" \
-            -target arm64-apple-ios15.0 \
-            -framework UIKit \
-            -framework WebKit \
-            -framework AVFoundation \
-            -o SmritiAI-iOS/SmritiAI.app/SmritiAI \
-            SmritiAI-iOS/Source/main.swift
-
-          echo "iOS executable compiled."
-
-
-      # ============================================================
-      # 8. CREATE INFO.PLIST
+      # 9. CREATE INFO PLIST
       # ============================================================
 
       - name: Create Info.plist
@@ -382,11 +396,6 @@ jobs:
               <key>UILaunchStoryboardName</key>
               <string>LaunchScreen</string>
 
-              <key>UIRequiredDeviceCapabilities</key>
-              <array>
-                  <string>arm64</string>
-              </array>
-
               <key>UISupportedInterfaceOrientations</key>
               <array>
                   <string>UIInterfaceOrientationPortrait</string>
@@ -415,7 +424,7 @@ jobs:
 
 
       # ============================================================
-      # 9. CREATE LAUNCH SCREEN
+      # 10. CREATE LAUNCH SCREEN
       # ============================================================
 
       - name: Create launch screen
@@ -439,8 +448,7 @@ jobs:
 
               <scenes>
 
-                  <scene
-                      sceneID="SmritiAI-Launch">
+                  <scene sceneID="SmritiAI-Launch">
 
                       <objects>
 
@@ -493,10 +501,57 @@ jobs:
 
 
       # ============================================================
-      # 10. AD-HOC SIGN FOR BUILD ARTIFACT
+      # 11. GET IOS SDK
       # ============================================================
 
-      - name: Ad hoc sign application
+      - name: Get iOS SDK
+        shell: bash
+        run: |
+
+          set -e
+
+          SDK=$(xcrun \
+              --sdk iphoneos \
+              --show-sdk-path)
+
+          echo "IOS_SDK=$SDK" >> "$GITHUB_ENV"
+
+          echo "Using SDK:"
+          echo "$SDK"
+
+
+      # ============================================================
+      # 12. COMPILE SWIFT
+      # ============================================================
+
+      - name: Compile SmritiAI
+        shell: bash
+        run: |
+
+          set -e
+
+          xcrun swiftc \
+            -parse-as-library \
+            -sdk "$IOS_SDK" \
+            -target arm64-apple-ios15.0 \
+            -module-name SmritiAI \
+            -framework UIKit \
+            -framework WebKit \
+            -o SmritiAI-iOS/SmritiAI.app/SmritiAI \
+            SmritiAI-iOS/Source/AppDelegate.swift \
+            SmritiAI-iOS/Source/ViewController.swift \
+            SmritiAI-iOS/Source/main.swift
+
+          echo "=========================================="
+          echo "Swift compilation successful"
+          echo "=========================================="
+
+
+      # ============================================================
+      # 13. SIGN APP
+      # ============================================================
+
+      - name: Sign SmritiAI
         shell: bash
         run: |
 
@@ -508,11 +563,40 @@ jobs:
             --sign - \
             SmritiAI-iOS/SmritiAI.app
 
-          echo "Application bundle signed with temporary local signature."
+          echo "Temporary signing completed."
 
 
       # ============================================================
-      # 11. PACKAGE IPA
+      # 14. VERIFY APP
+      # ============================================================
+
+      - name: Verify application
+        shell: bash
+        run: |
+
+          set -e
+
+          test -f \
+            SmritiAI-iOS/SmritiAI.app/SmritiAI
+
+          test -f \
+            SmritiAI-iOS/SmritiAI.app/index.html
+
+          test -f \
+            SmritiAI-iOS/SmritiAI.app/Info.plist
+
+          echo "=========================================="
+          echo "SMRITIAI IOS APP VERIFIED"
+          echo "=========================================="
+
+          find SmritiAI-iOS/SmritiAI.app \
+            -maxdepth 2 \
+            -type f \
+            | head -100
+
+
+      # ============================================================
+      # 15. CREATE IPA
       # ============================================================
 
       - name: Create IPA
@@ -529,31 +613,40 @@ jobs:
             SmritiAI-iOS/SmritiAI.app \
             SmritiAI-iOS/Payload/SmritiAI.app
 
+
           cd SmritiAI-iOS
+
 
           zip -qry \
             SmritiAI.ipa \
             Payload
 
+
           cd ..
+
+
+          test -f \
+            SmritiAI-iOS/SmritiAI.ipa
+
+
+          echo "=========================================="
+          echo "SMRITIAI IPA CREATED"
+          echo "=========================================="
 
           ls -lh \
             SmritiAI-iOS/SmritiAI.ipa
 
 
       # ============================================================
-      # 12. UPLOAD IPA
+      # 16. UPLOAD IPA
       # ============================================================
 
       - name: Upload SmritiAI iOS
         uses: actions/upload-artifact@v4
 
         with:
-
           name: SmritiAI-iOS
-
           path: |
             SmritiAI-iOS/SmritiAI.ipa
             SmritiAI-iOS/SmritiAI.app
-
           retention-days: 30
